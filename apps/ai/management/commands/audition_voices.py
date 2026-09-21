@@ -1,7 +1,7 @@
 """Generate a small side-by-side corpus to choose the TTS voice (not stored as AudioVariants).
 
     python manage.py audition_voices --dry-run
-    python manage.py audition_voices --voices marin cedar fable
+    python manage.py audition_voices --voices marin ballad cedar
 
 Writes MEDIA_ROOT/qa/tts-audition/<voice>/<level>/NN-slug.mp3, a manifest.json describing
 every file and an index.html to listen to all voices and levels side by side.

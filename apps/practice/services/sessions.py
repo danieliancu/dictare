@@ -20,6 +20,7 @@ from apps.listening.services.audio import (
     phrase_ids_with_audio,
 )
 from apps.listening.services.patterns import pattern_for_position, verified_patterns_for_variant
+from apps.listening.voices import DEFAULT_VOICE
 from apps.progress.services import daily, mastery
 from apps.scoring.services import ScoreResult, Status, score_answer
 
@@ -135,6 +136,13 @@ def _default_accent(owner: Owner) -> Accent:
     return accent
 
 
+def session_voice(owner: Owner) -> str:
+    """The learner's chosen voice; visitors without an account always hear Marin."""
+    if owner.is_authenticated:
+        return owner.user.profile.preferred_voice or DEFAULT_VOICE
+    return DEFAULT_VOICE
+
+
 @transaction.atomic
 def create_session(
     owner: Owner,
@@ -160,12 +168,13 @@ def create_session(
         pattern=pattern,
         local_date=owner.local_today(),
         target_count=count,
+        voice=session_voice(owner),
         **owner.fields(),
     )
     only_ids = None
     if settings.TTS_REQUIRE_APPROVAL:
         # Production: only phrases that already have an approved recording for this level.
-        only_ids = phrase_ids_with_audio(session.level, session.accent)
+        only_ids = phrase_ids_with_audio(session.level, session.accent, session.voice)
     phrases = choose_phrases(
         owner.user,
         count,
@@ -232,18 +241,22 @@ def maybe_complete_session(session: PracticeSession) -> bool:
 # --- attempts -------------------------------------------------------------------------------
 
 
-def ensure_audio(attempt: ListeningAttempt, accent: Accent) -> None:
-    """Attach the best servable recording for the attempt's level. Never calls a remote API.
+def ensure_audio(attempt: ListeningAttempt, accent: Accent, voice: str = DEFAULT_VOICE) -> None:
+    """Attach the best servable recording for the attempt's level and the session's voice.
+
+    Never calls a remote API: Play only ever serves a stored file.
 
     Completed attempts keep the recording the learner actually heard, so the explanation
     shown afterwards still matches that audio.
     """
     if attempt.completed and attempt.audio_variant_id:
         return
-    variant = get_audio_variant(attempt.phrase, attempt.level, accent)
+    variant = get_audio_variant(attempt.phrase, attempt.level, accent, voice)
     if variant is None and can_generate_on_request():
         try:
-            variant = generate_variant(attempt.phrase, attempt.level, accent, provider="mock")
+            variant = generate_variant(
+                attempt.phrase, attempt.level, accent, voice=voice, provider="mock"
+            )
         except TTSError:
             variant = None
     if variant is None:
@@ -263,7 +276,7 @@ def get_or_start_attempt(owner: Owner, item: SessionItem, level: str) -> Listeni
         )
     except IntegrityError:
         attempt = ListeningAttempt.objects.get(session_item=item)
-    ensure_audio(attempt, item.session.accent)
+    ensure_audio(attempt, item.session.accent, item.session.voice)
     return attempt
 
 
@@ -277,7 +290,7 @@ def change_level(attempt: ListeningAttempt, level: str, ent: Entitlements) -> bo
         if session.level != level:
             session.level = level
             session.save(update_fields=["level"])
-        ensure_audio(attempt, session.accent)
+        ensure_audio(attempt, session.accent, session.voice)
     return True
 
 

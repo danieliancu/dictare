@@ -1,12 +1,13 @@
-"""Generate (or reuse cached) audio variants for learners.
+"""Generate (or reuse cached) audio variants for learners — one or more voices at once.
 
-    python manage.py generate_audio --pilot --voice marin --dry-run
-    python manage.py generate_audio --pilot --voice marin --real-api
-    python manage.py generate_audio --pilot --level natural --limit 5 --real-api
-    python manage.py generate_audio                      # all phrases, TTS_PROVIDER
+    python manage.py generate_audio --pilot --voices marin ballad cedar --dry-run
+    python manage.py generate_audio --pilot --voices marin ballad cedar --real-api
+    python manage.py generate_audio --voices marin ballad cedar --real-api   # full corpus
+    python manage.py generate_audio --voice marin --level natural --limit 5 --real-api
 
-Files already generated with identical settings are reused, so an interrupted run can be
-resumed. New variants are `pending` until approved in the admin.
+OpenAI is paid once per variant: files already generated with identical settings are
+reused, so an interrupted run is resumed by running the same command again. Playback
+never calls OpenAI. New variants stay `pending` until approved in the admin.
 """
 
 from __future__ import annotations
@@ -22,14 +23,20 @@ from apps.ai.services.tts import (
     provider_identity,
 )
 from apps.listening.models import Accent, Level, ListeningPhrase
+from apps.listening.voices import VOICE_VALUES
 
 
 class Command(BaseCommand):
-    help = "Generate TTS audio variants (cached; new variants need QA approval)."
+    help = "Generate TTS audio variants for one or more voices (cached; QA approval needed)."
 
     def add_arguments(self, parser):
         parser.add_argument("--pilot", action="store_true", help="Only the pilot corpus.")
-        parser.add_argument("--voice", help="Voice (default: TTS_VOICE).")
+        parser.add_argument(
+            "--voices", nargs="+", help="Voices to generate, e.g. --voices marin ballad cedar."
+        )
+        parser.add_argument(
+            "--voice", action="append", help="Single voice (repeatable; same as --voices)."
+        )
         parser.add_argument(
             "--level",
             choices=Level.values,
@@ -57,7 +64,8 @@ class Command(BaseCommand):
             provider_name, model = provider_identity(provider)
         except TTSError as exc:
             raise CommandError(str(exc)) from exc
-        voice = opts["voice"] or settings.TTS_VOICE
+        voices = list(dict.fromkeys((opts["voices"] or []) + (opts["voice"] or [])))
+        voices = voices or [settings.TTS_VOICE]
         levels = opts["level"] or list(Level.values)
         accent = (
             Accent.objects.filter(code=opts["accent"]).first()
@@ -73,6 +81,14 @@ class Command(BaseCommand):
                     "prefer human recordings (provider=human) uploaded in the admin."
                 )
             )
+        for voice in voices:
+            if voice not in VOICE_VALUES:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"'{voice}' is not a product voice ({', '.join(VOICE_VALUES)}); "
+                        "learners cannot select it."
+                    )
+                )
 
         phrases = ListeningPhrase.objects.active().order_by("pk")
         if opts["pilot"]:
@@ -83,18 +99,21 @@ class Command(BaseCommand):
         if not phrases:
             raise CommandError("No phrases selected (run seed_demo; --pilot needs pilot phrases).")
 
-        plan = [(phrase, level) for phrase in phrases for level in levels]
+        plan = [(v, p, lv) for v in voices for p in phrases for lv in levels]
         cached = {
-            (phrase.pk, level)
-            for phrase, level in plan
-            if cached_variant(planned_key(phrase, level, accent, voice, provider)) is not None
+            (v, p.pk, lv)
+            for v, p, lv in plan
+            if cached_variant(planned_key(p, lv, accent, v, provider)) is not None
         }
-        todo = [(p, lv) for p, lv in plan if (p.pk, lv) not in cached]
         self.stdout.write(
-            f"{len(phrases)} phrases x {len(levels)} levels x 1 voice = {len(plan)} audio "
-            f"generations ({provider_name}/{model}, voice={voice}, accent={accent.code}, "
-            f"engine v{settings.TTS_ENGINE_VERSION}): {len(cached)} cached, "
-            f"{len(todo)} to generate."
+            f"{len(phrases)} phrases\n"
+            f"{len(voices)} voices ({', '.join(voices)})\n"
+            f"{len(levels)} levels ({', '.join(levels)})\n"
+            f"{len(plan)} possible variants\n"
+            f"{len(cached)} already cached\n"
+            f"{len(plan) - len(cached)} to generate\n"
+            f"provider={provider_name} model={model} accent={accent.code} "
+            f"engine=v{settings.TTS_ENGINE_VERSION}"
         )
         if opts["dry_run"]:
             self.stdout.write("Dry run: no API calls made.")
@@ -102,24 +121,37 @@ class Command(BaseCommand):
         if provider_name == "openai" and not settings.OPENAI_API_KEY:
             raise CommandError("OPENAI_API_KEY is not set in the environment (.env).")
 
-        done, failures = 0, []
-        for phrase, level in todo:
-            try:
-                generate_variant(phrase, level, accent, voice=voice, provider=provider)
-                done += 1
-                self.stdout.write(f"  ok   [{level:7}] {phrase.text}")
-            except TTSError as exc:
-                failures.append((phrase, level, exc))
-                self.stderr.write(
-                    f"  FAIL [{level:7}] voice={voice} {exc.kind}: {exc} | {phrase.text}"
-                )
-                if opts["fail_fast"]:
+        generated, reused, failures = 0, 0, []
+        stop = False
+        for voice in voices:
+            self.stdout.write(self.style.MIGRATE_HEADING(f"Voice: {voice.capitalize()}"))
+            for n, phrase in enumerate(phrases, start=1):
+                self.stdout.write(f"Phrase {n}/{len(phrases)}: {phrase.text}")
+                for level in levels:
+                    if (voice, phrase.pk, level) in cached:
+                        reused += 1
+                        self.stdout.write(f"  {level:8} cached")
+                        continue
+                    try:
+                        generate_variant(phrase, level, accent, voice=voice, provider=provider)
+                    except TTSError as exc:
+                        failures.append((phrase, voice, level, exc))
+                        self.stderr.write(f"  {level:8} FAILED ({exc.kind}): {exc}")
+                        if opts["fail_fast"]:
+                            stop = True
+                            break
+                        continue
+                    generated += 1
+                    self.stdout.write(f"  {level:8} generated")
+                if stop:
                     break
+            if stop:
+                break
 
-        self.stdout.write(
-            f"Generated {done}, reused {len(cached)}, failed {len(failures)}. "
-            "New variants are pending: review them in the admin before learners hear them."
-        )
+        self.stdout.write(f"\nGenerated: {generated}\nCached: {reused}\nFailed: {len(failures)}")
+        for phrase, voice, level, exc in failures:
+            self.stderr.write(f"  - [{voice}/{level}] {exc.kind}: {phrase.text}")
+        self.stdout.write("New variants are pending: listen and approve them in the admin.")
         if failures:
             raise CommandError(
                 f"{len(failures)} generation(s) failed; rerun the same command to retry them "

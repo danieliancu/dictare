@@ -71,7 +71,7 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = Profile
-        fields = ["timezone", "daily_goal", "preferred_accent"]
+        fields = ["preferred_voice", "timezone", "daily_goal", "preferred_accent"]
         widgets = {"daily_goal": forms.NumberInput(attrs={"min": 3, "max": 50})}
 
     def __init__(self, *args, user=None, **kwargs):
@@ -81,7 +81,9 @@ class ProfileForm(forms.ModelForm):
             self.fields["first_name"].initial = user.first_name
         self.fields["preferred_accent"].queryset = Accent.objects.filter(active=True)
         self.fields["preferred_accent"].empty_label = "Implicit (Standard Southern British)"
-        self.order_fields(["first_name", "timezone", "daily_goal", "preferred_accent"])
+        self.order_fields(
+            ["first_name", "preferred_voice", "timezone", "daily_goal", "preferred_accent"]
+        )
 
     def clean_daily_goal(self):
         goal = self.cleaned_data["daily_goal"]

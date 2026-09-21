@@ -29,7 +29,7 @@ def make_variant(
     level=Level.CLEAR,
     provider="openai",
     status=QA.APPROVED,
-    voice="fable",
+    voice="marin",
     key=None,
 ):
     variant = AudioVariant(
@@ -62,10 +62,14 @@ def review_all(variant, verification=AudioVariantPattern.Verification.PRESENT):
 
 @pytest.mark.django_db
 class TestSelection:
-    def test_human_approved_beats_tts_approved(self, phrases, accent):
-        make_variant(phrases[0], accent, provider="openai")
+    def test_tts_in_the_session_voice_beats_human(self, phrases, accent):
+        tts = make_variant(phrases[0], accent, provider="openai")
+        make_variant(phrases[0], accent, provider="human")
+        assert get_audio_variant(phrases[0], Level.CLEAR, accent, "marin") == tts
+
+    def test_human_used_when_no_tts_exists(self, phrases, accent):
         human = make_variant(phrases[0], accent, provider="human")
-        assert get_audio_variant(phrases[0], Level.CLEAR, accent) == human
+        assert get_audio_variant(phrases[0], Level.CLEAR, accent, "ballad") == human
 
     def test_rejected_never_selected(self, phrases, accent):
         make_variant(phrases[0], accent, status=QA.REJECTED)
@@ -306,7 +310,8 @@ class TestCommands:
             "generate_audio", "--pilot", "--voice", "marin", "--real-api", "--dry-run", stdout=out
         )
         text = out.getvalue()
-        assert "3 phrases x 3 levels x 1 voice = 9 audio generations" in text
+        assert "3 phrases\n1 voices (marin)\n3 levels" in text
+        assert "9 possible variants" in text
         assert "openai" in text and "No API calls" not in text and "no API calls" in text
 
     def test_generate_resumes_and_reports_failures(self, phrases, accent, monkeypatch):
@@ -339,7 +344,7 @@ class TestCommands:
         call_command(
             "generate_audio", "--provider", "mock", "--limit", "2", "--level", "clear", stdout=out
         )
-        assert "1 cached, 1 to generate" in out.getvalue()
+        assert "1 already cached\n1 to generate" in out.getvalue()
 
     @override_settings(OPENAI_API_KEY="")
     def test_real_api_without_key_fails_clearly(self, phrases, accent):

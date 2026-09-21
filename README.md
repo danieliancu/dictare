@@ -161,16 +161,41 @@ Configurare (`.env`, git-ignored — cheia se citește doar din environment):
 TTS_PROVIDER=openai
 OPENAI_API_KEY=...
 TTS_MODEL=gpt-4o-mini-tts
-TTS_VOICE=fable            # nu e definitivă până la audiția vocilor
+TTS_VOICE=marin            # vocea implicită a produsului
 TTS_ENGINE_VERSION=2
 TTS_REQUIRE_APPROVAL=False # True în producție
 ```
 
-**1. Alege vocea** (fișiere de comparat, nu intră în baza de date):
+#### Selecția vocii
+
+Cursanții aleg vocea exercițiilor în **Contul meu → Vocea exercițiilor**:
+
+- **Marin** — implicită (și pentru vizitatorii fără cont)
+- **Ballad**
+- **Cedar**
+
+Lista e definită o singură dată, în `apps/listening/voices.py`. O sesiune de exerciții își
+păstrează vocea de la creare: dacă utilizatorul schimbă vocea, se aplică de la sesiunea
+următoare, iar exercițiile deja rezolvate rămân legate de înregistrarea ascultată.
+
+Regula de selecție a audio-ului (`apps/listening/services/audio.py`), fără niciun apel OpenAI:
+
+1. înregistrare TTS în exact vocea sesiunii;
+2. dacă lipsește: înregistrare TTS cu **Marin** (fallback controlat, niciodată altă voce);
+3. înregistrare umană (`provider=human`), pentru accente/conținut fără TTS;
+4. doar în development: placeholder mock;
+5. altfel: „Audio indisponibil”.
+
+În producție se folosesc numai înregistrări aprobate cu fișierul existent.
+
+**Generarea OpenAI costă o singură dată. Playback-ul ulterior folosește MP3-ul salvat și nu mai
+cheamă OpenAI.**
+
+**1. Compară vocile** (fișiere de comparat, nu intră în baza de date):
 
 ```bash
 python manage.py audition_voices --dry-run
-python manage.py audition_voices --voices marin cedar fable
+python manage.py audition_voices --voices marin ballad cedar
 ```
 
 Rezultat în `media/qa/tts-audition/`: `<voce>/<nivel>/NN-fraza.mp3`, `manifest.json`
@@ -181,8 +206,8 @@ cu toate vocile și nivelurile una lângă alta. 11 fraze × 3 voci × 3 nivelur
 linking, contracții, eliziune, schwa, glottal T, întrebări, fraze scurte și lungi):
 
 ```bash
-python manage.py generate_audio --pilot --voice marin --dry-run   # 28 × 3 = 84, fără API
-python manage.py generate_audio --pilot --voice marin --real-api
+python manage.py generate_audio --pilot --voices marin ballad cedar --dry-run   # fără API
+python manage.py generate_audio --pilot --voices marin ballad cedar --real-api
 python manage.py generate_audio --pilot --voice marin --real-api --level natural --limit 5
 ```
 
@@ -211,8 +236,16 @@ Greșelile și nivelul de stăpânire (mastery) se atribuie tot numai tiparelor 
 audio aprobat. Request-urile cursanților nu generează niciodată audio și nu apelează OpenAI;
 dacă lipsește audio-ul, pagina afișează „Audio indisponibil”.
 
-**6. Generarea completă** (toate frazele) se face abia după alegerea vocii și validarea
-setărilor pe pilot: `python manage.py generate_audio --voice VOCEA_ALEASĂ --real-api`.
+**6. Corpusul complet** (toate frazele active × 3 niveluri × 3 voci), după pilot și QA:
+
+```bash
+python manage.py generate_audio --voices marin ballad cedar --dry-run    # numărul exact de MP3-uri
+python manage.py generate_audio --voices marin ballad cedar --real-api
+```
+
+Comanda afișează progresul pe voce și frază (`cached` / `generated` / `FAILED`) și un rezumat
+`Generated / Cached / Failed`. Dacă se întrerupe, rulează aceeași comandă: fișierele valide sunt
+sărite, doar cele lipsă se generează. Toate variantele noi rămân `pending` până la aprobare.
 
 Cache: fișierul e identificat prin hash-ul textului, providerului, modelului, vocii, accentului,
 instrucțiunilor complete, nivelului, vitezei și `TTS_ENGINE_VERSION`. Orice schimbare a
@@ -238,8 +271,8 @@ umane; sinteza vocală nu le redă fiabil.
 | `TTS_PROVIDER` | `mock` | `mock` sau `openai` |
 | `OPENAI_API_KEY` | — | |
 | `TTS_MODEL` | `gpt-4o-mini-tts` | |
-| `TTS_VOICE` | `fable` | vocea pentru `generate_audio` (de ales după audiție) |
-| `TTS_AUDITION_VOICES` | `marin,cedar,fable` | vocile pentru `audition_voices` |
+| `TTS_VOICE` | `marin` | vocea implicită (produs și `generate_audio`) |
+| `TTS_AUDITION_VOICES` | `marin,ballad,cedar` | vocile pentru `audition_voices` |
 | `TTS_ENGINE_VERSION` | `2` | schimbarea lui forțează regenerarea audio |
 | `TTS_REQUIRE_APPROVAL` | `False` (dev), `True` (prod) | servește doar audio aprobat |
 | `TTS_GENERATE_ON_REQUEST` | `True` (dev), `False` (prod) | doar placeholder mock, niciodată OpenAI |

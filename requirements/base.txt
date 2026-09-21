@@ -4,5 +4,5 @@ django-environ>=0.12
 django-htmx>=1.19
 whitenoise>=6.7
 gunicorn>=23.0
-openai>=1.40
+openai>=2.40,<3  # provider is written and tested against the 2.x API
 Pillow>=10.4

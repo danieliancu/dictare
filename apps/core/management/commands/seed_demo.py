@@ -272,8 +272,8 @@ TESTIMONIALS = [
     (
         "Înainte nu înțelegeam engleza când oamenii vorbeau, dar acum chiar înțeleg ce spun.",
         "Sophie L.",
-        "Franța",
-        "FR",
+        "România",
+        "RO",
     ),
     (
         "Lucrez în Londra de doi ani. Abia acum prind ce spun colegii la pauza de cafea.",

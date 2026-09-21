@@ -12,7 +12,7 @@ from apps.listening.models import AudioVariant, Level
 
 
 def request(**overrides):
-    base = dict(text="Shall we head off?", accent="ssb", voice="fable", style="clear", speed=0.95)
+    base = dict(text="Shall we head off?", accent="ssb", voice="marin", style="clear", speed=0.95)
     base.update(overrides)
     return tts.SpeechRequest(**base)
 
@@ -33,7 +33,7 @@ class TestCacheKey:
         "change",
         [
             {"text": "Shall we go?"},
-            {"voice": "marin"},
+            {"voice": "ballad"},
             {"style": "fast"},
             {"accent": "modern-rp"},
             {"speed": 1.1},

@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models import Q
 
 from apps.listening.models import AudioVariant, Level, ListeningPhrase
+from apps.listening.voices import DEFAULT_VOICE, VOICE_CHOICES
 
 
 class SessionKind(models.TextChoices):
@@ -37,6 +38,8 @@ class PracticeSession(models.Model):
     anon_key = models.CharField(max_length=64, blank=True, db_index=True)
     kind = models.CharField(max_length=20, choices=SessionKind.choices)
     level = models.CharField(max_length=10, choices=Level.choices, default=Level.CLEAR)
+    # Fixed when the session is created, so every phrase of a session uses the same voice.
+    voice = models.CharField(max_length=20, choices=VOICE_CHOICES, default=DEFAULT_VOICE)
     accent = models.ForeignKey("listening.Accent", on_delete=models.PROTECT, related_name="+")
     topic = models.ForeignKey(
         "listening.Topic", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"

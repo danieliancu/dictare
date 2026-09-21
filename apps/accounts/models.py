@@ -4,6 +4,8 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
 
+from apps.listening.voices import DEFAULT_VOICE, VOICE_CHOICES
+
 TIMEZONE_CHOICES = [
     ("Europe/London", "Regatul Unit (Londra)"),
     ("Europe/Dublin", "Irlanda (Dublin)"),
@@ -73,6 +75,13 @@ class Profile(models.Model):
         "fus orar", max_length=64, choices=TIMEZONE_CHOICES, default="Europe/London"
     )
     daily_goal = models.PositiveSmallIntegerField("obiectiv zilnic", default=10)
+    preferred_voice = models.CharField(
+        "vocea exercițiilor",
+        max_length=20,
+        choices=VOICE_CHOICES,
+        default=DEFAULT_VOICE,
+        help_text="Alege vocea britanică pe care vrei să o auzi în exerciții.",
+    )
     preferred_accent = models.ForeignKey(
         "listening.Accent",
         verbose_name="accent preferat",
