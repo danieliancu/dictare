@@ -34,6 +34,15 @@ def icon(name: str, css_class: str = "icon", label: str = "") -> str:
     return mark_safe(svg)  # noqa: S308 - trusted files from the repository
 
 
+@register.simple_tag
+def outcome_dots(misses, exposures, cap: int = 12) -> list[bool]:
+    """One flag per exposure (True = missed), capped; misses first so the red reads at a glance."""
+    exposures, misses = int(exposures or 0), int(misses or 0)
+    shown = min(exposures, cap)
+    missed = min(misses, shown)
+    return [True] * missed + [False] * (shown - missed)
+
+
 @register.filter
 def percent(value, total) -> int:
     try:
@@ -61,7 +70,8 @@ def donut(value: int, size: int = 88, stroke: int = 9, label: str = "") -> str:
         '<svg class="donut" width="{s}" height="{s}" viewBox="0 0 {s} {s}" role="img" '
         'aria-label="{label}{v}%">'
         '<circle class="donut__track" cx="{h}" cy="{h}" r="{r}" stroke-width="{w}" fill="none"/>'
-        '<circle class="donut__value" cx="{h}" cy="{h}" r="{r}" stroke-width="{w}" fill="none" '
+        '<circle class="donut__value" style="--donut-c: {c}" cx="{h}" cy="{h}" r="{r}" '
+        'stroke-width="{w}" fill="none" '
         'stroke-dasharray="{c}" stroke-dashoffset="{o}" transform="rotate(-90 {h} {h})"/>'
         "</svg>",
         s=size,

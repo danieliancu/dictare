@@ -1,0 +1,60 @@
+{# At-a-glance state of the learner, refreshed out-of-band after every htmx exercise swap. #}
+<section class="card card--pad glance" id="session-glance"{% if oob %} hx-swap-oob="true"{% endif %} aria-labelledby="glance-title">
+  <h2 class="card__title" id="glance-title">Situația ta</h2>
+
+  <div class="glance-top">
+    {% if user.is_authenticated %}
+      <div class="glance-streak{% if user_streak.current %} is-on{% endif %}">
+        {% icon "flame" %}
+        <div><strong>{{ user_streak.current }}</strong><span>{{ user_streak.current|pluralize:"zi,zile" }} la rând</span></div>
+      </div>
+    {% endif %}
+    {% if glance.goal %}
+      <div class="glance-goal">
+        <div>
+          <span class="glance-goal__label">Obiectiv zilnic</span>
+          <strong>{{ glance.today }} <small>/ {{ glance.goal }}</small></strong>
+          <span class="glance-goal__bar" style="--value: {{ glance.goal_pct }}%" aria-hidden="true"></span>
+        </div>
+        <span class="glance-goal__ring">{% donut glance.goal_pct 38 5 "Obiectiv zilnic: " %}</span>
+      </div>
+    {% elif glance.remaining is not None %}
+      <div class="glance-goal">
+        <div>
+          <span class="glance-goal__label">Încercare gratuită</span>
+          <strong>{{ glance.remaining }} <small>rămase azi</small></strong>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <ul class="glance-rows">
+    <li>
+      <span class="glance-rows__icon tile tile--blue">{% icon "headphones" %}</span>
+      <div><strong>Fraze ascultate</strong><span>{{ glance.done }} din {{ glance.dots|length }} în sesiune</span></div>
+      <em class="glance-rows__value">{% widthratio glance.done glance.dots|length 100 %}%</em>
+    </li>
+    <li class="{% if glance.average_tier %}glance-rows--{{ glance.average_tier }}{% endif %}">
+      <span class="glance-rows__icon tile tile--violet">{% icon "target" %}</span>
+      <div><strong>Scor mediu</strong><span>{% if glance.average is None %}după prima frază{% else %}din frazele verificate{% endif %}</span></div>
+      <em class="glance-rows__value">{% if glance.average is not None %}{{ glance.average }}%{% else %}–{% endif %}</em>
+    </li>
+  </ul>
+
+  <ol class="glance-dots" aria-label="Frazele sesiunii">
+    {% for d in glance.dots %}
+      <li class="glance-dot{% if d.tier %} glance-dot--{{ d.tier }}{% endif %}{% if d.current %} is-current{% endif %}"
+          title="Fraza {{ d.n }}{% if d.score is not None %}: {{ d.score }}%{% elif d.current %}: acum{% endif %}">
+        {% if d.score is not None %}{{ d.score }}{% else %}{{ d.n }}{% endif %}
+        <span class="sr-only">{% if d.score is not None %}% scor{% elif d.current %}, fraza curentă{% else %}, neîncepută{% endif %}</span>
+      </li>
+    {% endfor %}
+  </ol>
+
+  <p class="glance__insight">
+    {% if glance.average is None %}Prima frază te așteaptă. Ascult-o fără grabă.
+    {% elif glance.average_tier == "top" or glance.average_tier == "great" %}Ai o sesiune foarte bună. Încearcă un nivel mai rapid.
+    {% elif glance.average_tier == "close" %}Ești aproape. Uită-te la tiparele ratate.
+    {% else %}Reascultă frazele încet și citește explicațiile.{% endif %}
+  </p>
+</section>

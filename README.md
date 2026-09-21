@@ -236,6 +236,37 @@ Greșelile și nivelul de stăpânire (mastery) se atribuie tot numai tiparelor 
 audio aprobat. Request-urile cursanților nu generează niciodată audio și nu apelează OpenAI;
 dacă lipsește audio-ul, pagina afișează „Audio indisponibil”.
 
+**Auto-QA** (`--auto-qa` / `qa_audio`) — verificare automată, conservatoare:
+
+```bash
+python manage.py generate_audio --voices marin ballad cedar --dry-run
+python manage.py generate_audio --voices marin ballad cedar --real-api --auto-qa --workers 4
+python manage.py qa_audio --dry-run          # înregistrări pending de verificat
+python manage.py qa_audio --needs-review     # re-verifică (ex. după AUDIO_QA_VERSION nou)
+```
+
+Pentru fiecare MP3 (`apps/ai/services/audio_qa.py`):
+
+1. **tehnic** (fără API): fișier existent, MP3 valid, durată citită, provider/voce/nivel/accent
+   și metadate corecte → altfel `rejected`;
+2. **durată** plauzibilă față de numărul de cuvinte, nivel și viteză (ferestre tolerante);
+3. **transcriere** cu `gpt-4o-mini-transcribe`, fără textul așteptat; similaritate 0–100 cu
+   normalizarea produsului + încredere din logprobs;
+4. **accent + fonetică** cu evaluatorul audio (`gpt-audio`): compatibil britanic? fiecare
+   fenomen așteptat e `present` / `absent` / `uncertain` (doar cu încredere ≥ 0.8 devine
+   PRESENT/ABSENT; altfel rămâne UNVERIFIED);
+5. **niveluri**: Clear / Natural / Fast nu au voie să sune identic.
+
+Scor transparent (transcriere 45, încredere 15, durată 10, livrare 10, accent 10, fonetică 10)
+și decizie deterministă: **approved** doar dacă toate verificările trec, transcrierea e ≥ 98%
+cu încredere mare, accentul e confirmat britanic, toate fenomenele așteptate sunt verificate și
+scorul ≥ `AUDIO_QA_AUTO_APPROVE_SCORE`; **rejected** la eșec clar (MP3 invalid, transcriere
+< 94%, durată absurdă, accent clar non-britanic); altfel **needs_review** (ascultat manual în
+admin). Aprobările automate au `approval_source=automatic` și `reviewed_by` gol; staff-ul poate
+oricând suprascrie. Rezultatele sunt păstrate în cache per înregistrare + hash audio +
+`AUDIO_QA_VERSION` + modele — același MP3 nu e verificat de două ori. Erorile API (rate limit,
+timeout, 5xx) au retry cu backoff; autentificarea greșită oprește imediat.
+
 **6. Corpusul complet** (toate frazele active × 3 niveluri × 3 voci), după pilot și QA:
 
 ```bash
@@ -274,6 +305,11 @@ umane; sinteza vocală nu le redă fiabil.
 | `TTS_VOICE` | `marin` | vocea implicită (produs și `generate_audio`) |
 | `TTS_AUDITION_VOICES` | `marin,ballad,cedar` | vocile pentru `audition_voices` |
 | `TTS_ENGINE_VERSION` | `2` | schimbarea lui forțează regenerarea audio |
+| `AUDIO_QA_ENABLED` | `True` | auto-QA disponibil |
+| `AUDIO_QA_VERSION` | `2` | schimbarea lui re-rulează QA |
+| `AUDIO_QA_TRANSCRIBE_MODEL` | `gpt-4o-mini-transcribe` | transcriere pentru QA |
+| `AUDIO_QA_EVALUATOR_MODEL` | `gpt-audio` | evaluator audio (accent, fonetică) |
+| `AUDIO_QA_AUTO_APPROVE_SCORE` / `AUDIO_QA_REVIEW_SCORE` | `90` / `75` | praguri |
 | `TTS_REQUIRE_APPROVAL` | `False` (dev), `True` (prod) | servește doar audio aprobat |
 | `TTS_GENERATE_ON_REQUEST` | `True` (dev), `False` (prod) | doar placeholder mock, niciodată OpenAI |
 | `TTS_BROWSER_FALLBACK` | `True` în dev, mereu `False` în prod | vocea browserului pentru audio mock, doar cu `DEBUG` |

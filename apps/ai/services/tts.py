@@ -42,6 +42,12 @@ class TTSError(Exception):
     """Base class: audio could not be generated."""
 
     kind = "error"
+    transient = False  # worth retrying with backoff?
+
+    def __init__(self, message: str = "", *, transient: bool | None = None):
+        super().__init__(message)
+        if transient is not None:
+            self.transient = transient
 
 
 class TTSUnavailable(TTSError):
@@ -56,10 +62,12 @@ class TTSAuthError(TTSError):
 
 class TTSRateLimited(TTSError):
     kind = "rate_limit"
+    transient = True
 
 
 class TTSTimeout(TTSError):
     kind = "timeout"
+    transient = True
 
 
 class TTSBadResponse(TTSError):
@@ -243,11 +251,14 @@ class OpenAIProvider:
         except openai.APITimeoutError as exc:
             raise TTSTimeout(f"OpenAI did not answer within {self.timeout:.0f}s.") from exc
         except openai.APIConnectionError as exc:
-            raise TTSUnavailable("Could not reach the OpenAI API.") from exc
+            raise TTSUnavailable("Could not reach the OpenAI API.", transient=True) from exc
         except openai.BadRequestError as exc:
             raise TTSBadResponse(f"OpenAI refused the request: {exc.message}") from exc
         except openai.APIStatusError as exc:
-            raise TTSUnavailable(f"OpenAI service error (HTTP {exc.status_code}).") from exc
+            raise TTSUnavailable(
+                f"OpenAI service error (HTTP {exc.status_code}).",
+                transient=exc.status_code >= 500,
+            ) from exc
 
         if not audio:
             raise TTSBadResponse("OpenAI returned empty audio.")

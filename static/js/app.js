@@ -20,6 +20,16 @@
     menu.classList.toggle("is-open", open);
     if (header) header.classList.toggle("is-scrolled", open || window.scrollY > 8);
   });
+  /* "?" help toggles: show/hide the explanation named by aria-controls */
+  document.addEventListener("click", (e) => {
+    const toggle = e.target.closest("[data-help-toggle]");
+    if (!toggle) return;
+    const panel = document.getElementById(toggle.getAttribute("aria-controls"));
+    const open = toggle.getAttribute("aria-expanded") !== "true";
+    toggle.setAttribute("aria-expanded", String(open));
+    if (panel) panel.hidden = !open;
+  });
+
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     const toggle = document.querySelector('[data-nav-toggle][aria-expanded="true"]');

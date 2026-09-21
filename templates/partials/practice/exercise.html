@@ -82,30 +82,35 @@
 
     {% elif state == "result" %}
       <section class="result" aria-labelledby="result-title">
-        <div class="result__score">
-          <div class="donut-wrap">{% donut attempt.score 64 7 "Scor: " %}<span class="donut-wrap__label">{{ attempt.score }}</span></div>
-          <div class="result__verdict">
-            <strong id="result-title" tabindex="-1" {% if just_checked %}data-autofocus{% endif %}>{{ verdict }}</strong>
-            <span>Cuvinte corecte: {{ attempt.word_accuracy }}%{% if attempt.revealed_before_check %} · transcriere văzută înainte de verificare{% endif %}</span>
-          </div>
-        </div>
-
-        <div>
-          <p class="result__label">Transcriere</p>
-          <p class="transcript" lang="en-GB">
-            {% for w in words %}<span class="w w--{{ w.status }}">{{ w.text }}{% if w.status != "correct" %}<span class="sr-only"> ({{ w.label }}{% if w.typed and w.status == "incorrect" %}, ai scris „{{ w.typed }}”{% endif %})</span>{% endif %}{% if w.typed and w.status == "incorrect" %}<span class="w__typed" aria-hidden="true">{{ w.typed }}</span>{% endif %}</span>{% endfor %}
+        <div class="result-sentence correction{% if just_checked %} is-fresh{% endif %}">
+          {% if typed_line %}
+            <p class="correction__line correction__line--typed" lang="en-GB">
+              <span class="sr-only">Ai scris: </span>
+              {% for t in typed_line %}<span class="c-w{% if t.wrong %} is-wrong{% endif %}" style="--i: {{ forloop.counter0 }}">{{ t.text }}</span> {% endfor %}
+            </p>
+            <span class="correction__arrow" aria-hidden="true">↓</span>
+          {% endif %}
+          <p class="correction__line correction__line--right transcript" lang="en-GB">
+            <span class="sr-only">Fraza corectă: </span>
+            {% for w in words %}{% if w.status != "extra" %}<span class="c-w{% if w.status == "contraction" or w.status == "spelling" %} is-minor{% endif %}{% if w.status == "missing" or w.status == "incorrect" or w.status == "order" %} is-fixed{% endif %}" style="--i: {{ forloop.counter0 }}">{{ w.text }}{% if w.status != "correct" %}<span class="sr-only"> ({{ w.label }}{% if w.typed and w.status == "incorrect" %}, ai scris „{{ w.typed }}”{% endif %})</span>{% endif %}</span> {% endif %}{% endfor %}
           </p>
-          <div class="legend" aria-hidden="true" style="margin-top: 8px">
-            <span><i class="l-correct"></i>corect</span><span><i class="l-missing"></i>lipsă / greșit</span><span><i class="l-extra"></i>în plus</span><span><i class="l-order"></i>altă ordine</span><span><i class="l-minor"></i>formă contrasă / ortografie</span>
-          </div>
         </div>
 
-        {% if attempt.typed_answer %}<p class="your-answer">Ai scris: <q lang="en-GB">{{ attempt.typed_answer }}</q></p>{% endif %}
-        {% if attempt.phrase.translation_ro %}<p class="translation">Înțeles: {{ attempt.phrase.translation_ro }}</p>{% endif %}
+        <div class="result-hero result-hero--{{ tier }}{% if just_checked %} is-fresh{% endif %}" data-result-hero data-tier="{{ tier }}">
+          <div class="result-hero__text">
+            <strong id="result-title" tabindex="-1" {% if just_checked %}data-autofocus{% endif %}>{{ verdict }}</strong>
+            <span>{{ words_got }} din {{ words_total }} cuvinte prinse{% if words_missed %} · {{ words_missed }} {{ words_missed|pluralize:"ratat,ratate" }}{% endif %}</span>
+            {% if attempt.revealed_before_check %}<span class="result-hero__note">{% icon "eye" %} Transcriere văzută înainte de verificare</span>{% endif %}
+          </div>
+          <div class="donut-wrap result-hero__donut">
+            {% donut attempt.score 64 6 "Scor: " %}
+            <span class="donut-wrap__label"><span data-count-to="{{ attempt.score }}">{{ attempt.score }}</span><small>%</small></span>
+            <span class="result-hero__spark" aria-hidden="true">{% icon "sparkle" %}</span>
+          </div>
+        </div>
 
         {% if heard_explanations %}
           <div>
-            <p class="result__label">În această înregistrare</p>
             <ul class="explain-list">
               {% for e in heard_explanations %}{% include "components/explanation_item.html" %}{% endfor %}
             </ul>
@@ -146,4 +151,4 @@
     {% endif %}
   {% endif %}
 </div>
-{% if request.htmx and not request.htmx.history_restore_request %}{% include "components/step_list.html" with oob=True %}{% endif %}
+{% if request.htmx and not request.htmx.history_restore_request %}{% include "components/step_list.html" with oob=True %}{% include "components/session_glance.html" with oob=True %}{% endif %}

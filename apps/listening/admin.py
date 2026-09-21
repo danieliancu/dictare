@@ -11,6 +11,7 @@ from apps.ai.services.tts import TTSError, generate_variant
 
 from .models import (
     Accent,
+    AudioQAResult,
     AudioVariant,
     AudioVariantPattern,
     Level,
@@ -187,10 +188,12 @@ class AudioVariantPatternInline(admin.TabularInline):
         "verification",
         "realisation",
         "explanation_override_ro",
+        "source",
+        "confidence",
         "verified_by",
         "verified_at",
     ]
-    readonly_fields = ["verified_by", "verified_at"]
+    readonly_fields = ["source", "confidence", "verified_by", "verified_at"]
     verbose_name_plural = "Tipare: ce se aude efectiv în această înregistrare"
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -225,6 +228,70 @@ def unverified_count(obj):
     return count or "—"
 
 
+def _latest_qa(obj):
+    results = getattr(obj, "_qa_cache", None)
+    if results is None:
+        results = list(obj.qa_results.all())
+        obj._qa_cache = results
+    return results[0] if results else None
+
+
+def _yes_no(value):
+    return "—" if value is None else ("✓" if value else "✗")
+
+
+@admin.display(description="Auto-QA")
+def qa_decision(obj):
+    r = _latest_qa(obj)
+    return (
+        f"{r.get_decision_display()} · {r.overall_score}"
+        if r and r.overall_score is not None
+        else (r.get_decision_display() if r else "—")
+    )
+
+
+@admin.display(description="Transcriere")
+def qa_transcript(obj):
+    r = _latest_qa(obj)
+    if not r or r.transcript_similarity is None:
+        return "—"
+    conf = f" · {r.confidence_label}" if r.confidence_label else ""
+    return f"{r.transcript_similarity:.0f}%{conf}"
+
+
+@admin.display(description="Accent / livrare / fonetic")
+def qa_flags(obj):
+    r = _latest_qa(obj)
+    if not r:
+        return "—"
+    return f"{_yes_no(r.accent_pass)} / {_yes_no(r.delivery_pass)} / {_yes_no(r.phonetic_pass)}"
+
+
+class AudioQAResultInline(admin.TabularInline):
+    model = AudioQAResult
+    extra = 0
+    can_delete = False
+    fields = [
+        "created_at",
+        "qa_version",
+        "decision",
+        "overall_score",
+        "transcript_text",
+        "transcript_similarity",
+        "confidence_label",
+        "duration_pass",
+        "accent_label",
+        "delivery_pass",
+        "phonetic_pass",
+        "reasons",
+    ]
+    readonly_fields = fields
+    verbose_name_plural = "Auto-QA (cel mai recent primul)"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(AudioVariant)
 class AudioVariantAdmin(admin.ModelAdmin):
     list_display = [
@@ -236,13 +303,17 @@ class AudioVariantAdmin(admin.ModelAdmin):
         "model",
         duration_label,
         "qa_status",
+        "approval_source",
+        qa_decision,
+        qa_transcript,
+        qa_flags,
         unverified_count,
         file_status,
-        "generated_at",
         audio_preview,
     ]
     list_filter = [
         "qa_status",
+        "approval_source",
         "level",
         "voice",
         "provider",
@@ -267,6 +338,7 @@ class AudioVariantAdmin(admin.ModelAdmin):
         "generated_at",
         "reviewed_by",
         "reviewed_at",
+        "approval_source",
     ]
     fieldsets = [
         (
@@ -285,7 +357,16 @@ class AudioVariantAdmin(admin.ModelAdmin):
         ),
         (
             "QA",
-            {"fields": ["qa_status", "pattern_review", "qa_notes", "reviewed_by", "reviewed_at"]},
+            {
+                "fields": [
+                    "qa_status",
+                    "approval_source",
+                    "pattern_review",
+                    "qa_notes",
+                    "reviewed_by",
+                    "reviewed_at",
+                ]
+            },
         ),
         (
             "Generare",
@@ -305,7 +386,7 @@ class AudioVariantAdmin(admin.ModelAdmin):
             },
         ),
     ]
-    inlines = [AudioVariantPatternInline]
+    inlines = [AudioVariantPatternInline, AudioQAResultInline]
     actions = ["approve_selected", "reject_selected"]
     date_hierarchy = "generated_at"
     change_list_template = "admin/listening/audiovariant/change_list.html"
@@ -314,7 +395,7 @@ class AudioVariantAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .prefetch_related("pattern_checks", "phrase__phrase_patterns")
+            .prefetch_related("pattern_checks", "phrase__phrase_patterns", "qa_results")
         )
 
     @admin.display(description="Verificare fenomene")

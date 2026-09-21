@@ -62,6 +62,7 @@
 
     setState(state, message) {
       this.el.dataset.state = state;
+      if (state === "playing") markStep("listen");
       const playing = state === "playing";
       this.playBtn.setAttribute("aria-label", playing ? "Pauză" : "Redă fraza");
       if (message && this.statusEl) this.statusEl.textContent = message;
@@ -310,11 +311,70 @@
     }
   }
 
+  /* Step list (listen state): nothing is lit until the learner starts.
+     Playing lights "listen"; typing marks it done and lights "write". */
+  function markStep(step) {
+    const listen = document.querySelector('#step-list [data-step="listen"]');
+    const write = document.querySelector('#step-list [data-step="write"]');
+    if (!listen || !write || listen.classList.contains("is-done") && step === "listen") return;
+    if (step === "listen" && !write.classList.contains("is-current")) {
+      listen.classList.add("is-current");
+    } else if (step === "write") {
+      listen.classList.remove("is-current");
+      listen.classList.add("is-done");
+      write.classList.add("is-current");
+    }
+  }
+
+  document.addEventListener("input", (e) => {
+    if (e.target.matches && e.target.matches("[data-answer]") && e.target.value.trim()) markStep("write");
+  });
+
+  /* Result hero: count the score up and celebrate a top score. Only right after "Verifică". */
+  const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function celebrate(hero) {
+    if (!hero.classList.contains("is-fresh") || hero._celebrated || reducedMotion()) return;
+    hero._celebrated = true;
+    const num = hero.querySelector("[data-count-to]");
+    if (num) {
+      const target = parseInt(num.dataset.countTo, 10) || 0;
+      const start = performance.now() + 150;
+      const tick = (now) => {
+        const t = Math.min(1, Math.max(0, (now - start) / 1100));
+        num.textContent = Math.round(target * (1 - Math.pow(1 - t, 3)));
+        if (t < 1) requestAnimationFrame(tick);
+      };
+      num.textContent = "0";
+      requestAnimationFrame(tick);
+    }
+    if (hero.dataset.tier === "top" || hero.dataset.tier === "great") {
+      const colors = ["#16a34a", "#0f9f7a", "#1f6fe5", "#7a5af8", "#ff7a1a", "#f5b700"];
+      const box = document.createElement("div");
+      box.className = "confetti";
+      box.setAttribute("aria-hidden", "true");
+      const count = hero.dataset.tier === "top" ? 60 : 28;
+      for (let i = 0; i < count; i++) {
+        const p = document.createElement("i");
+        p.style.cssText =
+          `--x:${Math.random() * 100}%;--dx:${(Math.random() - 0.5) * 120}px;` +
+          `--r:${(Math.random() - 0.5) * 900}deg;--d:${0.9 + Math.random() * 0.5}s;` +
+          `--t:${1.3 + Math.random() * 0.9}s;--c:${colors[i % colors.length]}`;
+        box.appendChild(p);
+      }
+      hero.appendChild(box);
+      setTimeout(() => box.remove(), 3500);
+    }
+  }
+
   function init(root) {
+    document.querySelectorAll("[data-result-hero]").forEach(celebrate);
     (root || document).querySelectorAll("[data-player]").forEach((el) => {
       if (el._player) return;
       el._player = new Player(el);
     });
+    const answer = document.querySelector("[data-answer]");
+    if (answer && answer.value.trim()) markStep("write");
   }
 
   document.addEventListener("DOMContentLoaded", () => init(document));

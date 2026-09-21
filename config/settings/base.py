@@ -163,6 +163,19 @@ TTS_REQUIRE_APPROVAL = env.bool("TTS_REQUIRE_APPROVAL", default=False)
 # Development convenience: generate a *mock* placeholder when a phrase has no audio.
 # Real providers are never called from a request.
 TTS_GENERATE_ON_REQUEST = env.bool("TTS_GENERATE_ON_REQUEST", default=False)
+# --- Automatic audio QA (see apps/ai/services/audio_qa.py) -----------------
+AUDIO_QA_ENABLED = env.bool("AUDIO_QA_ENABLED", default=True)
+# Bump to re-run QA on every recording after changing the QA rules.
+AUDIO_QA_VERSION = env("AUDIO_QA_VERSION", default="2")
+AUDIO_QA_TRANSCRIBE_MODEL = env("AUDIO_QA_TRANSCRIBE_MODEL", default="gpt-4o-mini-transcribe")
+AUDIO_QA_EVALUATOR_MODEL = env("AUDIO_QA_EVALUATOR_MODEL", default="gpt-audio")
+AUDIO_QA_AUTO_APPROVE_SCORE = env.int("AUDIO_QA_AUTO_APPROVE_SCORE", default=90)
+AUDIO_QA_REVIEW_SCORE = env.int("AUDIO_QA_REVIEW_SCORE", default=75)
+AUDIO_QA_PATTERN_CONFIDENCE = env.float("AUDIO_QA_PATTERN_CONFIDENCE", default=0.8)
+AUDIO_QA_ACCENT_CONFIDENCE = env.float("AUDIO_QA_ACCENT_CONFIDENCE", default=0.7)
+# Independent evaluator calls that must all agree (a single audio-model call is not reliable).
+AUDIO_QA_EVALUATOR_RUNS = env.int("AUDIO_QA_EVALUATOR_RUNS", default=2)
+
 TTS_AUDITION_VOICES = env.list("TTS_AUDITION_VOICES", default=["marin", "ballad", "cedar"])
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 

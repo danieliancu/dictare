@@ -62,9 +62,13 @@ def skip_reason(problems: list[str]) -> str:
 
 
 @transaction.atomic
-def set_status(variants, status: str, user, notes: str | None = None) -> tuple[int, Counter]:
+def set_status(
+    variants, status: str, user, notes: str | None = None, *, source: str = "human"
+) -> tuple[int, Counter]:
     """Set the QA status. Approval requires `approval_problems()` to be empty.
 
+    `source` records who decided: "human" (staff, `user` set) or "automatic" (auto-QA,
+    `user` None) — an automatic approval never pretends a person reviewed it.
     Returns (changed, skipped reasons counter).
     """
     changed, skipped = 0, Counter()
@@ -75,9 +79,10 @@ def set_status(variants, status: str, user, notes: str | None = None) -> tuple[i
                 skipped[skip_reason(problems)] += 1
                 continue
         variant.qa_status = status
-        variant.reviewed_by = user
+        variant.reviewed_by = user if source == "human" else None
         variant.reviewed_at = timezone.now()
-        fields = ["qa_status", "reviewed_by", "reviewed_at"]
+        variant.approval_source = source
+        fields = ["qa_status", "reviewed_by", "reviewed_at", "approval_source"]
         if notes is not None:
             variant.qa_notes = notes
             fields.append("qa_notes")
@@ -113,3 +118,5 @@ def mark_pattern_checked(check: AudioVariantPattern, user) -> None:
     if check.verification != Verification.UNVERIFIED:
         check.verified_by = user
         check.verified_at = timezone.now()
+        check.source = "human"
+        check.confidence = None

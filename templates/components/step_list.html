@@ -1,7 +1,7 @@
 <ol class="step-list" id="step-list"{% if oob %} hx-swap-oob="true"{% endif %} aria-label="Pașii exercițiului">
-        <li class="{% if state == 'listen' %}is-current{% elif state == 'result' %}is-done{% endif %}">Ascultă fraza</li>
-        <li class="{% if state == 'listen' %}is-current{% elif state == 'result' %}is-done{% endif %}">Scrie ce ai auzit</li>
+        {# Listen state: step 1 pulses until the learner types; player.js then moves the pulse to step 2. #}
+        <li data-step="listen" class="{% if state == 'result' %}is-done{% elif state == 'listen' %}is-current{% endif %}">Ascultă fraza</li>
+        <li data-step="write"{% if state == 'result' %} class="is-done"{% endif %}>Scrie ce ai auzit</li>
         <li class="{% if state == 'result' %}is-done{% endif %}">Verifică</li>
         <li class="{% if state == 'result' %}is-current{% endif %}">Înțelege de ce</li>
-        <li>Repetă</li>
       </ol>

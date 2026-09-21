@@ -13,3 +13,6 @@ htmlcov/
 test-artifacts/
 .idea/
 .vscode/
+
+# Local notes (may contain credentials) — never commit
+todo.txt

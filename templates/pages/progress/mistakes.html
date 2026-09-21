@@ -25,7 +25,18 @@
             <span class="problem__rate {% if m.miss_rate >= 60 %}trend-down{% endif %}">{{ m.miss_rate }}%</span>
           </div>
           <span class="bar{% if m.miss_rate >= 60 %} bar--danger{% elif m.miss_rate >= 30 %} bar--warning{% else %} bar--success{% endif %}" role="progressbar" aria-label="Rată de ratare {{ m.pattern.name_ro }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ m.miss_rate }}"><span class="bar__fill" style="--value: {{ m.miss_rate }}%"></span></span>
-          <p>Ratat în {{ m.misses }} din {{ m.exposures }} fraze · stăpânire {{ m.mastery }}%. {{ m.pattern.description_ro }}</p>
+          <div class="problem__stats">
+            <div class="problem__stat problem__stat--ring{% if m.mastery < 40 %} is-low{% elif m.mastery < 70 %} is-mid{% else %} is-high{% endif %}">
+              <span class="donut-wrap">{% donut m.mastery 46 5 "Stăpânire: " %}<span class="donut-wrap__label">{{ m.mastery }}</span></span>
+              <span><strong>{{ m.mastery }}%</strong>stăpânire</span>
+            </div>
+            <div class="problem__stat">
+              {% outcome_dots m.misses m.exposures as dots %}
+              <span class="outcome-dots" aria-hidden="true">{% for missed in dots %}<i class="{% if missed %}is-miss{% else %}is-ok{% endif %}"></i>{% endfor %}{% if m.exposures > 12 %}<em>+{{ m.exposures|add:"-12" }}</em>{% endif %}</span>
+              <span><strong>{{ m.misses }} din {{ m.exposures }}</strong>{{ m.exposures|pluralize:"frază ratată,fraze ratate" }}</span>
+            </div>
+          </div>
+          <p>{{ m.pattern.description_ro }}</p>
         </div>
         <form method="post" action="{% url 'practice:pattern' m.pattern.slug %}">
           {% csrf_token %}
@@ -38,7 +49,7 @@
   {% if frequent_words %}
     <h2 class="section-title">Cuvinte ratate des</h2>
     <ul class="word-cloud">
-      {% for w in frequent_words %}<li class="badge badge--danger" lang="en-GB">{{ w.expected_word|lower }} · {{ w.n }}</li>{% endfor %}
+      {% for w in frequent_words %}<li class="badge badge--danger" lang="en-GB">{{ w.expected_word|lower }}</li>{% endfor %}
     </ul>
   {% endif %}
 

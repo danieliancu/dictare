@@ -286,9 +286,14 @@ def audio_upload_path(instance: "AudioVariant", filename: str) -> str:
 
 class AudioVariant(models.Model):
     class QAStatus(models.TextChoices):
-        PENDING = "pending", "De verificat"
+        PENDING = "pending", "Neverificat încă"
         APPROVED = "approved", "Aprobat"
+        NEEDS_REVIEW = "needs_review", "De ascultat manual"
         REJECTED = "rejected", "Respins"
+
+    class ApprovalSource(models.TextChoices):
+        AUTOMATIC = "automatic", "Automat (auto-QA)"
+        HUMAN = "human", "Om (staff)"
 
     HUMAN = "human"
 
@@ -317,12 +322,20 @@ class AudioVariant(models.Model):
     engine_version = models.CharField("versiune motor TTS", max_length=20, blank=True)
     qa_status = models.CharField(
         "status QA",
-        max_length=10,
+        max_length=15,
         choices=QAStatus.choices,
         default=QAStatus.PENDING,
         db_index=True,
     )
     qa_notes = models.TextField("note QA", blank=True)
+    approval_source = models.CharField(
+        "decizie luată de",
+        max_length=10,
+        choices=ApprovalSource.choices,
+        blank=True,
+        help_text="Automat = auto-QA; om = staff. Gol = încă nicio decizie.",
+    )
+    audio_sha256 = models.CharField(max_length=64, blank=True, db_index=True, editable=False)
     reviewed_at = models.DateTimeField("verificat la", null=True, blank=True)
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -422,6 +435,13 @@ class AudioVariantPattern(TimeStamped):
         blank=True,
         related_name="+",
     )
+    source = models.CharField(
+        "verificat de",
+        max_length=10,
+        choices=AudioVariant.ApprovalSource.choices,
+        blank=True,
+    )
+    confidence = models.FloatField("încredere (auto-QA)", null=True, blank=True)
 
     class Meta:
         ordering = ["audio_variant", "phrase_pattern__start_token"]
@@ -443,3 +463,51 @@ class AudioVariantPattern(TimeStamped):
             and self.audio_variant.phrase_id != self.phrase_pattern.phrase_id
         ):
             raise ValidationError("Tiparul trebuie să aparțină aceleiași fraze ca varianta audio.")
+
+
+class AudioQAResult(models.Model):
+    """One automatic QA run of one recording (cached per audio hash + QA version + models)."""
+
+    class Decision(models.TextChoices):
+        APPROVED = "approved", "Aprobat automat"
+        NEEDS_REVIEW = "needs_review", "De ascultat manual"
+        REJECTED = "rejected", "Respins"
+        ERROR = "error", "Eroare (se reia)"
+
+    audio_variant = models.ForeignKey(
+        AudioVariant, on_delete=models.CASCADE, related_name="qa_results"
+    )
+    cache_key = models.CharField(max_length=64, unique=True)
+    qa_version = models.CharField(max_length=20)
+    audio_sha256 = models.CharField(max_length=64)
+    transcribe_model = models.CharField(max_length=60, blank=True)
+    evaluator_model = models.CharField(max_length=60, blank=True)
+    technical_pass = models.BooleanField(default=False)
+    transcript_pass = models.BooleanField(null=True)
+    transcript_text = models.TextField(blank=True)
+    transcript_similarity = models.FloatField(null=True)
+    transcript_confidence = models.FloatField(null=True)
+    confidence_label = models.CharField(max_length=10, blank=True)
+    duration_pass = models.BooleanField(null=True)
+    accent_pass = models.BooleanField(null=True)
+    accent_label = models.CharField(max_length=30, blank=True)
+    delivery_pass = models.BooleanField(null=True)
+    phonetic_pass = models.BooleanField(null=True)
+    overall_score = models.PositiveSmallIntegerField(null=True)
+    decision = models.CharField(max_length=15, choices=Decision.choices)
+    reasons = models.JSONField(default=list, blank=True)
+    raw_metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Rezumate mici (logprob, evaluator), nu răspunsuri brute.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "rezultat auto-QA"
+        verbose_name_plural = "rezultate auto-QA"
+        indexes = [models.Index(fields=["audio_variant", "-created_at"])]
+
+    def __str__(self) -> str:
+        return f"{self.audio_variant} · {self.get_decision_display()} ({self.overall_score})"

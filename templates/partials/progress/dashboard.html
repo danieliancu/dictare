@@ -95,11 +95,14 @@
   <section class="dash-card" aria-labelledby="d-reco">
     <h2 id="d-reco" class="dash-card__title">Recomandări</h2>
     {% if recommendations %}
-      <ul class="reco-list">
+      <ul class="reco-list reco-list--stacked">
         {% for m in recommendations %}
           <li>
-            <span class="reco-list__icon tile tile--{% cycle 'violet' 'red' 'teal' %}">{% icon "target" %}</span>
-            <div><strong>{{ m.pattern.name_ro }}</strong><span>{{ m.mastery }}% stăpânire · {{ m.exposures }} expuneri</span></div>
+            <div class="reco-list__head">
+              <span class="reco-list__icon tile tile--{% cycle 'violet' 'red' 'teal' %}">{% icon "target" %}</span>
+              <strong>{{ m.pattern.name_ro }}</strong>
+            </div>
+            <span class="reco-list__meta">{{ m.mastery }}% stăpânire · {{ m.exposures }} {{ m.exposures|pluralize:"expunere,expuneri" }}</span>
             <form method="post" action="{% url 'practice:pattern' m.pattern.slug %}">{% csrf_token %}<button class="btn btn--sm btn--outline-blue" type="submit">Exersează</button></form>
           </li>
         {% endfor %}
@@ -140,10 +143,11 @@
         {% for m in stats.patterns %}
           {% if entitlements.advanced_progress or forloop.counter <= 5 %}
             <li>
-              <span>{{ m.pattern.name_ro }}</span>
+              <span class="pattern-bars__name">{{ m.pattern.name_ro }}{% if m.pattern.description_ro %}<button class="help-dot" type="button" data-help-toggle aria-expanded="false" aria-controls="pattern-help-{{ m.pattern.slug }}" aria-label="Ce înseamnă „{{ m.pattern.name_ro }}”?">?</button>{% endif %}</span>
               <span class="bar{% if m.mastery < 40 %} bar--danger{% elif m.mastery < 70 %} bar--warning{% else %} bar--success{% endif %}"><span class="bar__fill" style="--value: {{ m.mastery }}%"></span></span>
               <b>{{ m.mastery }}%</b>
-              {% if entitlements.advanced_progress %}<small>{{ m.exposures }} expuneri · {{ m.misses }} ratări</small>{% endif %}
+              {% if m.pattern.description_ro %}<p class="pattern-help" id="pattern-help-{{ m.pattern.slug }}" hidden>{{ m.pattern.description_ro }}</p>{% endif %}
+              {% if entitlements.advanced_progress %}<small>{{ m.exposures }} {{ m.exposures|pluralize:"expunere,expuneri" }} · {{ m.misses }} {{ m.misses|pluralize:"ratare,ratări" }}</small>{% endif %}
             </li>
           {% endif %}
         {% endfor %}

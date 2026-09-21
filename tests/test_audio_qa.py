@@ -204,7 +204,7 @@ class TestVariantPatterns:
         page = client.get(
             reverse("practice:session", args=[attempt.session_item.session_id]) + "?pas=1"
         ).content.decode()
-        assert "În această înregistrare" in page
+        assert "Tendință frecventă" not in page  # the verified pattern is listed as heard
 
         def shown(pp):
             return f'explain-item__frag" lang="en-GB">{pp.fragment}<' in page

@@ -137,6 +137,7 @@ def no_real_openai(settings, monkeypatch, request):
     def refuse(self):
         raise AssertionError("A test tried to create a real OpenAI client (network call).")
 
-    from apps.ai.services import tts
+    from apps.ai.services import audio_qa, tts
 
     monkeypatch.setattr(tts.OpenAIProvider, "_client", refuse)
+    monkeypatch.setattr(audio_qa, "openai_client", lambda: refuse(None))

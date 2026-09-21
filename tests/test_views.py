@@ -181,7 +181,7 @@ class TestPracticeFlow:
         )
         assert response.status_code == 200
         body = response.content.decode()
-        assert "Transcriere" in body and "Tendință frecventă în vorbirea naturală" in body
+        assert "correction__line--right" in body and "Tendință frecventă în vorbirea naturală" in body
         attempt.refresh_from_db()
         assert attempt.completed and attempt.score == 100
         assert response.headers["HX-Trigger"] == "progress-updated"

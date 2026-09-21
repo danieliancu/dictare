@@ -8,8 +8,9 @@ the first tier with a servable recording whose file exists wins:
 3. human recording (``provider=human``) — for accents or content without TTS;
 4. development only (TTS_REQUIRE_APPROVAL=False): the offline mock placeholder.
 
-Inside a tier: approved before pending, current engine version first, then newest — never
-database order. "Servable" means approved, or pending when TTS_REQUIRE_APPROVAL is False.
+Inside a tier: approved before others, current engine version first, then newest — never
+database order. "Servable" means approved; in development (TTS_REQUIRE_APPROVAL=False) also
+pending / needs_review.
 Rejected recordings and rows whose file is missing are never served.
 """
 
@@ -26,9 +27,10 @@ MOCK = "mock"
 
 
 def servable_statuses() -> list[str]:
+    """Production: approved only. Development may also play not-yet-approved audio."""
     if settings.TTS_REQUIRE_APPROVAL:
         return [QA.APPROVED]
-    return [QA.APPROVED, QA.PENDING]
+    return [QA.APPROVED, QA.PENDING, QA.NEEDS_REVIEW]
 
 
 def _tts(voice: str) -> Q:

@@ -276,6 +276,10 @@ class TestApproval:
             "pattern_checks-INITIAL_FORMS": "0",
             "pattern_checks-MIN_NUM_FORMS": "0",
             "pattern_checks-MAX_NUM_FORMS": "1000",
+            "qa_results-TOTAL_FORMS": "0",
+            "qa_results-INITIAL_FORMS": "0",
+            "qa_results-MIN_NUM_FORMS": "0",
+            "qa_results-MAX_NUM_FORMS": "1000",
         }
         response = client.post(url, data, follow=True)
         variant.refresh_from_db()

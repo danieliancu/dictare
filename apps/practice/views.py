@@ -1,3 +1,5 @@
+from collections import Counter
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -13,6 +15,7 @@ from apps.core.ratelimit import rate_limit
 from apps.listening.models import LEVEL_DESCRIPTIONS, Level, SpeechPattern, Topic
 from apps.listening.services.patterns import patterns_for_variant
 from apps.progress.services.mastery import group_progress
+from apps.scoring.normalize import surface_tokens
 from apps.scoring.services import Status, score_answer
 
 from .models import ListeningAttempt, PracticeSession, SessionKind
@@ -40,6 +43,22 @@ def verdict_for(score: int) -> str:
     if score >= 30:
         return "Bun început. Uită-te la tiparele de mai jos."
     return "Fraza asta a fost grea. Ascult-o din nou cu transcrierea."
+
+
+def tier_for(score: int) -> str:
+    """Visual tier of the result card (colour, icon, celebration)."""
+    if score >= 95:
+        return "top"
+    if score >= 80:
+        return "great"
+    if score >= 60:
+        return "close"
+    if score >= 30:
+        return "start"
+    return "hard"
+
+
+RESULT_ICONS = {"top": "trophy", "great": "star", "close": "target", "start": "zap", "hard": "ear"}
 
 
 # --- helpers ------------------------------------------------------------------------------
@@ -84,11 +103,60 @@ def _result_words(result) -> list[dict]:
     ]
 
 
+def _typed_line(typed_answer: str, words: list[dict]) -> list[dict]:
+    """The learner's own sentence, with the tokens the scorer rejected flagged as wrong."""
+    wrong = Counter()
+    for w in words:
+        if w["status"] == Status.EXTRA:
+            wrong[w["text"]] += 1
+        elif w["status"] in (Status.INCORRECT, Status.ORDER) and w["typed"]:
+            wrong[w["typed"]] += 1
+    line = []
+    for display, norm in surface_tokens(typed_answer or ""):
+        bad = wrong[norm] > 0
+        if bad:
+            wrong[norm] -= 1
+        line.append({"text": display, "wrong": bad})
+    return line
+
+
+def _glance(request, owner, items, scored, position, remaining) -> dict:
+    """At-a-glance state for the practice aside: session dots, average, today's goal."""
+    scores = [s for s in scored.values() if s is not None]
+    glance = {
+        "dots": [
+            {
+                "n": i + 1,
+                "score": scored.get(i),
+                "tier": tier_for(scored[i]) if scored.get(i) is not None else "",
+                "current": i == position,
+            }
+            for i in range(len(items))
+        ],
+        "done": len(scored),
+        "average": round(sum(scores) / len(scores)) if scores else None,
+        "average_tier": tier_for(round(sum(scores) / len(scores))) if scores else "",
+        "remaining": remaining,
+    }
+    if owner.user is not None:
+        from apps.progress.services.stats import completed_today
+
+        today, goal = completed_today(owner.user), request.user.profile.daily_goal
+        goal_pct = min(100, round(100 * today / goal)) if goal else 0
+        glance.update(today=today, goal=goal, goal_pct=goal_pct)
+    return glance
+
+
 def _exercise_context(request, session: PracticeSession, position: int | None) -> dict:
     owner = svc.owner_from_request(request)
     ent = get_entitlements(owner.user)
     items = svc.session_items(session)
-    done = svc.completed_positions(session)
+    scored = dict(
+        ListeningAttempt.objects.filter(session_item__session=session, completed=True).values_list(
+            "session_item__position", "score"
+        )
+    )
+    done = set(scored)
     completed_count = len(done)
     context = {
         "session": session,
@@ -101,6 +169,7 @@ def _exercise_context(request, session: PracticeSession, position: int | None) -
         "session_url": reverse("practice:session", args=[session.pk]),
     }
     remaining = svc.remaining_exercises(owner, ent)
+    context["glance"] = _glance(request, owner, items, scored, position, remaining)
 
     if position is None:  # every item done → summary
         attempts = list(
@@ -158,10 +227,20 @@ def _exercise_context(request, session: PracticeSession, position: int | None) -
             )
         ]
         anon_done = svc.completed_today(owner) if owner.user is None else 0
+        words = _result_words(result)
+        tier = tier_for(attempt.score or 0)
         context.update(
             result=result,
             verdict=verdict_for(attempt.score or 0),
-            words=_result_words(result),
+            tier=tier,
+            tier_icon=RESULT_ICONS[tier],
+            words=words,
+            typed_line=_typed_line(attempt.typed_answer, words),
+            words_got=sum(
+                w["status"] in (Status.CORRECT, Status.CONTRACTION, Status.SPELLING) for w in words
+            ),
+            words_missed=sum(w["status"] in (Status.MISSING, Status.INCORRECT) for w in words),
+            words_total=sum(w["status"] != Status.EXTRA for w in words),
             heard_explanations=[e for e in explanations if e["heard"]],
             tendency_explanations=[e for e in explanations if not e["heard"]],
             show_signup_nudge=owner.user is None
