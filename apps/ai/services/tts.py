@@ -1,14 +1,18 @@
-"""Text-to-speech service layer.
+"""Text-to-speech: generation of audio variants (the *write* path).
 
-Business code calls `get_or_create_variant(phrase, level, accent)` (or the lower-level
-`generate_speech`). Providers are pluggable and selected with the TTS_PROVIDER setting:
+Generation only happens in management commands and the admin, never inside a learner's
+request (see `apps.listening.services.audio.get_audio_variant` for the read path).
 
-* ``mock``   – offline, deterministic WAV placeholder (no API key, used in dev and tests)
-* ``openai`` – OpenAI speech API with per-level style instructions
+Providers are pluggable and selected with TTS_PROVIDER:
 
-Generated audio is cached: a variant is identified by a hash of everything that affects the
-output (text, accent, voice, level/style, speed, model, provider, engine version), so the same
-file is never generated twice.
+* ``mock``   – offline, deterministic WAV placeholder (no API key; dev and tests)
+* ``openai`` – OpenAI Speech API; model and voice from TTS_MODEL / TTS_VOICE
+
+Every generated file is cached under a hash of everything that shapes the audio — text,
+provider, model, voice, accent, the full instructions sent, level, speed and
+TTS_ENGINE_VERSION — so a prompt change never silently reuses an old recording.
+New variants start with ``qa_status=pending``: a successful API call is not proof that the
+audio is pedagogically correct.
 """
 
 from __future__ import annotations
@@ -26,11 +30,45 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 
+from .audio_meta import audio_duration_ms, looks_like_mp3
+
 logger = logging.getLogger(__name__)
 
 
-class TTSUnavailable(Exception):
-    """Raised when audio cannot be generated (provider misconfigured or failing)."""
+# --- errors ---------------------------------------------------------------------------------
+
+
+class TTSError(Exception):
+    """Base class: audio could not be generated."""
+
+    kind = "error"
+
+
+class TTSUnavailable(TTSError):
+    """Provider misconfigured, unknown, or the service is unreachable."""
+
+    kind = "unavailable"
+
+
+class TTSAuthError(TTSError):
+    kind = "authentication"
+
+
+class TTSRateLimited(TTSError):
+    kind = "rate_limit"
+
+
+class TTSTimeout(TTSError):
+    kind = "timeout"
+
+
+class TTSBadResponse(TTSError):
+    """Empty or malformed audio returned by the provider."""
+
+    kind = "bad_response"
+
+
+# --- delivery per level -----------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -39,34 +77,47 @@ class LevelStyle:
     instructions: str
 
 
-# Levels differ in delivery, not only in speed.
+# Levels differ first by *delivery*; speed only nudges. Keep speeds moderate: a sped-up
+# recording sounds artificial, which is the opposite of what the product trains.
 LEVEL_STYLES: dict[str, LevelStyle] = {
     "clear": LevelStyle(
-        speed=0.92,
+        speed=0.95,
         instructions=(
-            "Speak clearly and carefully, slightly slower than normal conversation, "
-            "articulating each word while still sounding natural and friendly."
+            "Deliver this line slightly slower than ordinary conversation, with clear "
+            "articulation, so a learner can follow every word. Keep a natural British rhythm "
+            "and intonation: do not pronounce the words in isolation, do not exaggerate or "
+            "over-enunciate, and do not sound like a language textbook. Keep contractions "
+            "natural. Use only light connected speech and avoid heavy reductions."
         ),
     ),
     "natural": LevelStyle(
         speed=1.0,
         instructions=(
-            "Speak at a normal conversational pace, like a native speaker chatting with a "
-            "friend. Use natural connected speech: weak forms of function words, linking "
-            "between words and relaxed rhythm. Stress only the important words."
+            "Deliver this line at a normal conversational speed, as a native speaker would say "
+            "it to a friend or colleague. Use natural rhythm and intonation, connected speech, "
+            "linking between words, contractions, and the weak forms of function words where a "
+            "native speaker would normally use them. Stress only the words that carry meaning. "
+            "No artificial over-enunciation; it should sound like real conversation, not "
+            "educational audio."
         ),
     ),
     "fast": LevelStyle(
-        speed=1.12,
+        speed=1.08,
         instructions=(
-            "Speak quickly and casually, like a native speaker in a hurry. Use strong "
-            "connected speech: reduced function words, elision, glottal stops where natural "
-            "and everyday reductions. Keep it realistic, not exaggerated."
+            "Deliver this line fluently and somewhat faster than ordinary speech, like a "
+            "relaxed native speaker in casual conversation. Use natural connected speech and "
+            "realistic reductions: weak function words, elision and assimilation where they "
+            "would naturally occur, and glottal stops only where they are natural for this "
+            "accent and register. Keep a natural rhythm. Do not force or exaggerate any "
+            "feature and do not caricature the accent."
         ),
     ),
 }
 
-DEFAULT_ACCENT_INSTRUCTIONS = "Use a Standard Southern British English accent."
+DEFAULT_ACCENT_INSTRUCTIONS = (
+    "Speak contemporary Standard Southern British English with natural, modern British "
+    "pronunciation."
+)
 
 
 @dataclass(frozen=True)
@@ -80,10 +131,10 @@ class SpeechRequest:
 
     @property
     def instructions(self) -> str:
+        """The exact instruction text sent to the provider (part of the cache key)."""
         style = LEVEL_STYLES.get(self.style)
-        return " ".join(
-            filter(None, [self.accent_instructions, style.instructions if style else ""])
-        )
+        parts = [self.accent_instructions, style.instructions if style else ""]
+        return " ".join(p.strip() for p in parts if p and p.strip())
 
 
 @dataclass
@@ -91,8 +142,13 @@ class SpeechResult:
     audio: bytes
     extension: str
     duration_ms: int
+    duration_measured: bool
     provider: str
+    model: str
     settings: dict = field(default_factory=dict)
+
+
+# --- providers ------------------------------------------------------------------------------
 
 
 class TTSProvider(Protocol):
@@ -103,9 +159,10 @@ class TTSProvider(Protocol):
 
 
 class MockProvider:
-    """Deterministic WAV placeholder: one soft 'syllable' pulse per word, no real speech.
+    """Deterministic WAV placeholder: one soft pulse per word, no real speech.
 
-    Lets the whole flow (player, waveform, timing, caching) run without any API key.
+    Lets the whole flow (player, waveform, caching, QA) run without an API key.
+    Mock audio can never be approved for learners.
     """
 
     name = "mock"
@@ -139,26 +196,35 @@ class MockProvider:
             audio=buf.getvalue(),
             extension="wav",
             duration_ms=round(1000 * total / self.sample_rate),
+            duration_measured=True,
             provider=self.name,
-            settings={"model": self.model, "speed": request.speed, "placeholder": True},
+            model=self.model,
+            settings={"speed": request.speed, "placeholder": True},
         )
 
 
 class OpenAIProvider:
+    """OpenAI Speech API. The API key comes only from settings/env and is never logged."""
+
     name = "openai"
 
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, timeout: float = 60.0):
         if not api_key:
-            raise TTSUnavailable("OPENAI_API_KEY is not configured.")
-        self.api_key = api_key
+            raise TTSUnavailable("OPENAI_API_KEY is not set in the environment.")
+        self._api_key = api_key
         self.model = model
+        self.timeout = timeout
+
+    def _client(self):
+        from openai import OpenAI
+
+        return OpenAI(api_key=self._api_key, timeout=self.timeout, max_retries=2)
 
     def synthesize(self, request: SpeechRequest) -> SpeechResult:
-        try:
-            from openai import OpenAI
+        import openai
 
-            client = OpenAI(api_key=self.api_key, timeout=30)
-            response = client.audio.speech.create(
+        try:
+            response = self._client().audio.speech.create(
                 model=self.model,
                 voice=request.voice,
                 input=request.text,
@@ -167,49 +233,91 @@ class OpenAIProvider:
                 response_format="mp3",
             )
             audio = response.read()
-        except Exception as exc:  # network/auth/quota errors all mean "unavailable"
-            logger.warning("OpenAI TTS failed: %s", exc)
-            raise TTSUnavailable(str(exc)) from exc
+        except openai.AuthenticationError as exc:
+            # The SDK message contains a masked key: never propagate or log it.
+            raise TTSAuthError("OpenAI rejected the API key (check OPENAI_API_KEY).") from exc
+        except openai.PermissionDeniedError as exc:
+            raise TTSAuthError("OpenAI denied access to this model or voice.") from exc
+        except openai.RateLimitError as exc:
+            raise TTSRateLimited("OpenAI rate limit or quota exceeded.") from exc
+        except openai.APITimeoutError as exc:
+            raise TTSTimeout(f"OpenAI did not answer within {self.timeout:.0f}s.") from exc
+        except openai.APIConnectionError as exc:
+            raise TTSUnavailable("Could not reach the OpenAI API.") from exc
+        except openai.BadRequestError as exc:
+            raise TTSBadResponse(f"OpenAI refused the request: {exc.message}") from exc
+        except openai.APIStatusError as exc:
+            raise TTSUnavailable(f"OpenAI service error (HTTP {exc.status_code}).") from exc
+
+        if not audio:
+            raise TTSBadResponse("OpenAI returned empty audio.")
+        if not looks_like_mp3(audio):
+            raise TTSBadResponse("OpenAI returned data that is not an MP3 file.")
+        duration = audio_duration_ms(audio, "mp3")
         return SpeechResult(
             audio=audio,
             extension="mp3",
-            duration_ms=_mp3_duration_ms(audio),
+            duration_ms=duration or 0,
+            duration_measured=duration is not None,
             provider=self.name,
-            settings={
-                "model": self.model,
-                "voice": request.voice,
-                "speed": request.speed,
-                "instructions": request.instructions,
-            },
+            model=self.model,
+            settings={"voice": request.voice, "speed": request.speed, "format": "mp3"},
         )
 
 
-def _mp3_duration_ms(audio: bytes, bitrate_kbps: int = 128) -> int:
-    """Rough estimate for constant-bitrate MP3; the player reads the exact duration."""
-    return round(len(audio) * 8 / bitrate_kbps)
+PROVIDERS = {
+    "mock": lambda: MockProvider(),
+    "openai": lambda: OpenAIProvider(settings.OPENAI_API_KEY, settings.TTS_MODEL),
+}
 
 
 def get_provider(name: str | None = None) -> TTSProvider:
     name = name or settings.TTS_PROVIDER
-    if name == "mock":
-        return MockProvider()
+    factory = PROVIDERS.get(name)
+    if factory is None:
+        raise TTSUnavailable(f"Unknown TTS provider: {name}")
+    return factory()
+
+
+def provider_identity(name: str | None = None) -> tuple[str, str]:
+    """(provider name, model) without needing credentials — for dry runs and planning."""
+    name = name or settings.TTS_PROVIDER
     if name == "openai":
-        return OpenAIProvider(settings.OPENAI_API_KEY, settings.TTS_MODEL)
+        return "openai", settings.TTS_MODEL
+    if name == "mock":
+        return "mock", MockProvider.model
     raise TTSUnavailable(f"Unknown TTS provider: {name}")
 
 
+# --- cache key & requests ---------------------------------------------------------------------
+
+
 def cache_key(request: SpeechRequest, provider: str, model: str) -> str:
+    """Hash of everything that influences the generated audio."""
     parts = [
         request.text.strip(),
-        request.accent,
-        request.voice,
-        request.style,
-        f"{request.speed:.2f}",
         provider,
         model,
-        settings.TTS_ENGINE_VERSION,
+        request.voice,
+        request.accent,
+        request.instructions,
+        request.style,
+        f"{request.speed:.3f}",
+        str(settings.TTS_ENGINE_VERSION),
     ]
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+
+
+def build_request(text: str, level: str, accent, voice: str | None = None) -> SpeechRequest:
+    style = LEVEL_STYLES[level]
+    return SpeechRequest(
+        text=text,
+        accent=accent.code,
+        voice=voice or settings.TTS_VOICE,
+        style=level,
+        speed=style.speed,
+        accent_instructions=accent.tts_instructions or DEFAULT_ACCENT_INSTRUCTIONS,
+    )
 
 
 def generate_speech(
@@ -225,57 +333,66 @@ def generate_speech(
     return get_provider(provider).synthesize(request)
 
 
-def build_request(phrase, level: str, accent, voice: str | None = None) -> SpeechRequest:
-    style = LEVEL_STYLES[level]
-    return SpeechRequest(
-        text=phrase.text,
-        accent=accent.code,
-        voice=voice or settings.TTS_VOICE,
-        style=level,
-        speed=style.speed,
-        accent_instructions=accent.tts_instructions or DEFAULT_ACCENT_INSTRUCTIONS,
-    )
+# --- audio variants (write path) ----------------------------------------------------------------
 
 
-def get_or_create_variant(phrase, level: str, accent, provider: str | None = None):
-    """Return the cached AudioVariant, generating and storing audio only when missing.
+def planned_key(phrase, level: str, accent, voice: str | None = None, provider=None) -> str:
+    """Cache key a generation would use, without calling the provider."""
+    name, model = provider_identity(provider)
+    return cache_key(build_request(phrase.text, level, accent, voice), name, model)
 
-    Human recordings uploaded in the admin (provider="human") always win.
-    """
+
+def cached_variant(key: str):
     from apps.listening.models import AudioVariant
 
-    existing = (
-        AudioVariant.objects.filter(phrase=phrase, level=level, accent=accent)
-        .exclude(audio_file="")
-        .order_by("-generated_at")
-    )
-    human = existing.filter(provider="human").first()
-    if human:
-        return human
+    variant = AudioVariant.objects.filter(cache_key=key).first()
+    if (
+        variant
+        and variant.audio_file
+        and variant.audio_file.storage.exists(variant.audio_file.name)
+    ):
+        return variant
+    return None
+
+
+def generate_variant(phrase, level: str, accent, voice: str | None = None, provider=None):
+    """Return the cached variant for these exact settings, generating it only if missing.
+
+    Never deletes other variants (older engine versions or voices keep their QA state).
+    """
+    from apps.listening.models import AudioVariant
+    from apps.listening.services.patterns import create_expected_checks
 
     tts = get_provider(provider)
-    request = build_request(phrase, level, accent)
+    request = build_request(phrase.text, level, accent, voice)
     key = cache_key(request, tts.name, tts.model)
-    cached = AudioVariant.objects.filter(cache_key=key).first()
-    if cached and cached.audio_file and cached.audio_file.storage.exists(cached.audio_file.name):
-        return cached
+    existing = cached_variant(key)
+    if existing is not None:
+        return existing
 
     result = tts.synthesize(request)
-    variant = cached or AudioVariant(
+    variant = AudioVariant.objects.filter(cache_key=key).first() or AudioVariant(
         phrase=phrase, level=level, accent=accent, voice=request.voice, cache_key=key
     )
     variant.provider = result.provider
+    variant.model = result.model
+    variant.instructions = request.instructions
+    variant.speed = request.speed
+    variant.engine_version = str(settings.TTS_ENGINE_VERSION)
     variant.duration_ms = result.duration_ms
+    variant.duration_measured = result.duration_measured
     variant.generation_settings = result.settings
+    variant.qa_status = AudioVariant.QAStatus.PENDING
     variant.audio_file.save(f"{key}.{result.extension}", ContentFile(result.audio), save=False)
     try:
         with transaction.atomic():
-            # A different engine version/model leaves an older row for the same voice.
-            AudioVariant.objects.filter(
-                phrase=phrase, level=level, accent=accent, voice=request.voice
-            ).exclude(cache_key=key).delete()
             variant.save()
-    except IntegrityError:  # generated concurrently by another request
+            create_expected_checks(variant)
+    except IntegrityError:  # generated concurrently elsewhere
         return AudioVariant.objects.get(cache_key=key)
-    logger.info("Generated %s audio for phrase %s (%s)", result.provider, phrase.pk, level)
+    logger.debug("Generated %s audio for phrase %s (%s)", result.provider, phrase.pk, level)
     return variant
+
+
+# Backwards-compatible name used by older code paths.
+get_or_create_variant = generate_variant

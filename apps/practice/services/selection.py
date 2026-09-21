@@ -74,6 +74,7 @@ def choose_phrases(
     topic=None,
     pattern=None,
     max_difficulty: int | None = None,
+    only_ids: set[int] | None = None,
     recommender: Recommender | None = None,
     seed: str | int | None = None,
 ) -> list[ListeningPhrase]:
@@ -90,6 +91,8 @@ def choose_phrases(
         qs = qs.filter(phrase_patterns__pattern=pattern).distinct()
     if max_difficulty is not None:
         qs = qs.filter(difficulty__lte=max_difficulty)
+    if only_ids is not None:
+        qs = qs.filter(pk__in=only_ids)
     phrases = list(qs)
     if not phrases:
         return []

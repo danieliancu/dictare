@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import prefetch_related_objects
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -10,6 +11,7 @@ from apps.ai.services.tts import LEVEL_STYLES
 from apps.billing.services.entitlements import get_entitlements
 from apps.core.ratelimit import rate_limit
 from apps.listening.models import LEVEL_DESCRIPTIONS, Level, SpeechPattern, Topic
+from apps.listening.services.patterns import patterns_for_variant
 from apps.progress.services.mastery import group_progress
 from apps.scoring.services import Status, score_answer
 
@@ -94,7 +96,7 @@ def _exercise_context(request, session: PracticeSession, position: int | None) -
         "progress_pct": round(100 * completed_count / len(items)) if items else 0,
         "entitlements": ent,
         "is_anonymous": owner.user is None,
-        "browser_fallback": settings.TTS_BROWSER_FALLBACK,
+        "browser_fallback": settings.TTS_BROWSER_FALLBACK and settings.DEBUG,
         "session_url": reverse("practice:session", args=[session.pk]),
     }
     remaining = svc.remaining_exercises(owner, ent)
@@ -137,20 +139,30 @@ def _exercise_context(request, session: PracticeSession, position: int | None) -
     if attempt.completed:
         result = score_answer(attempt.phrase.text, attempt.typed_answer)
         missed_positions = {w.position for w in result.mistakes if w.position is not None}
-        explanations = []
-        for pp in attempt.phrase.phrase_patterns.select_related("pattern"):
-            explanations.append(
-                {
-                    "pp": pp,
-                    "missed": any(pp.covers(p) for p in missed_positions),
-                }
+        # Only patterns that apply to *this* recording: verified ones are described as heard,
+        # unverified ones only as a general tendency; verified-absent ones are not shown.
+        prefetch_related_objects([attempt.phrase], "phrase_patterns__pattern")
+        if attempt.audio_variant:
+            prefetch_related_objects([attempt.audio_variant], "pattern_checks")
+        explanations = [
+            {
+                "pp": applied.phrase_pattern,
+                "heard": applied.heard,
+                "realisation": applied.realisation,
+                "text": applied.text,
+                "missed": any(applied.covers(p) for p in missed_positions),
+            }
+            for applied in patterns_for_variant(
+                attempt.audio_variant, attempt.phrase, attempt.level
             )
+        ]
         anon_done = svc.completed_today(owner) if owner.user is None else 0
         context.update(
             result=result,
             verdict=verdict_for(attempt.score or 0),
             words=_result_words(result),
-            explanations=explanations,
+            heard_explanations=[e for e in explanations if e["heard"]],
+            tendency_explanations=[e for e in explanations if not e["heard"]],
             show_signup_nudge=owner.user is None
             and anon_done >= settings.ANONYMOUS_SIGNUP_NUDGE_AFTER,
         )
@@ -357,7 +369,7 @@ def speech_text(request, attempt_id):
     Only served for placeholder (mock) audio and only when TTS_BROWSER_FALLBACK is on,
     so the transcript is never embedded in the page itself.
     """
-    if not settings.TTS_BROWSER_FALLBACK:
+    if not (settings.TTS_BROWSER_FALLBACK and settings.DEBUG):
         raise Http404
     attempt = _owned_attempt(request, attempt_id)
     if attempt.audio_variant and not attempt.audio_variant.is_placeholder:

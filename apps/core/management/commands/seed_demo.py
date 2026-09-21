@@ -10,13 +10,12 @@ from __future__ import annotations
 import random
 from datetime import datetime, time, timedelta
 
-from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.ai.services.tts import TTSUnavailable, get_or_create_variant
+from apps.ai.services.tts import DEFAULT_ACCENT_INSTRUCTIONS, TTSError, generate_variant
 from apps.billing.models import Plan, Subscription
 from apps.core.models import Testimonial
 from apps.listening.models import (
@@ -28,7 +27,7 @@ from apps.listening.models import (
     SpeechPattern,
     Topic,
 )
-from apps.listening.seed_data import PHRASES
+from apps.listening.seed_data import PHRASES, PILOT
 from apps.practice.models import ListeningAttempt, PracticeSession, SessionItem, SessionKind
 from apps.practice.services.sessions import save_mistakes
 from apps.progress.models import DailyPractice
@@ -58,8 +57,7 @@ ACCENTS = [
         True,
         True,
         True,
-        "Use a Standard Southern British English accent (the modern standard accent of "
-        "southern England).",
+        DEFAULT_ACCENT_INSTRUCTIONS,
         "Accentul standard modern din sudul Angliei; cel mai des auzit la BBC și în Londra.",
     ),
     (
@@ -69,7 +67,8 @@ ACCENTS = [
         True,
         True,
         False,
-        "Use a Modern Received Pronunciation British English accent.",
+        "Speak Modern Received Pronunciation British English, natural and contemporary, "
+        "not old-fashioned or exaggerated.",
         "Pronunția „educată” modernă, clară, folosită des în media.",
     ),
     (
@@ -350,6 +349,8 @@ class Command(BaseCommand):
         return out
 
     def seed_phrases(self, topics, patterns) -> None:
+        """Idempotent. Updates patterns in place so audio verifications are preserved."""
+        pilot = set(PILOT)
         for row in PHRASES:
             phrase, _ = ListeningPhrase.objects.update_or_create(
                 text=row["text"],
@@ -358,18 +359,24 @@ class Command(BaseCommand):
                     "topic": topics[row["topic"]],
                     "difficulty": row["difficulty"],
                     "active": True,
+                    "in_pilot": row["text"] in pilot,
                 },
             )
-            phrase.phrase_patterns.all().delete()
+            keep = []
             for p in row["patterns"]:
-                PhrasePattern(
-                    phrase=phrase,
-                    pattern=patterns[p["pattern"]],
-                    fragment=p["fragment"],
-                    sounds_like=p.get("sounds_like", ""),
-                    explanation_ro=p["explanation_ro"],
-                ).save()
-        self.stdout.write(f"  fraze: {len(PHRASES)}")
+                pp = PhrasePattern.objects.filter(
+                    phrase=phrase, pattern=patterns[p["pattern"]], fragment=p["fragment"]
+                ).first() or PhrasePattern(
+                    phrase=phrase, pattern=patterns[p["pattern"]], fragment=p["fragment"]
+                )
+                pp.sounds_like = p.get("sounds_like", "")
+                pp.ro_approximation = p.get("ro_approximation", "")
+                pp.explanation_ro = p["explanation_ro"]
+                pp.expected_from_level = p.get("expected_from_level", Level.CLEAR)
+                pp.save()
+                keep.append(pp.pk)
+            phrase.phrase_patterns.exclude(pk__in=keep).delete()
+        self.stdout.write(f"  fraze: {len(PHRASES)} (pilot: {len(pilot)})")
 
     def seed_plans(self) -> None:
         for plan in PLANS:
@@ -389,17 +396,18 @@ class Command(BaseCommand):
             )
 
     def seed_audio(self) -> None:
+        """Offline placeholder audio only. Real audio: `generate_audio --real-api`."""
         accent = Accent.default()
         made = 0
         try:
             for phrase in ListeningPhrase.objects.active():
                 for level in Level.values:
-                    get_or_create_variant(phrase, level, accent)
+                    generate_variant(phrase, level, accent, provider="mock")
                     made += 1
-        except TTSUnavailable as exc:
+        except TTSError as exc:
             self.stdout.write(self.style.WARNING(f"  audio indisponibil: {exc}"))
             return
-        self.stdout.write(f"  variante audio ({settings.TTS_PROVIDER}): {made}")
+        self.stdout.write(f"  mock audio variants (placeholders, never approved): {made}")
 
     # --- demo users -------------------------------------------------------------------
 

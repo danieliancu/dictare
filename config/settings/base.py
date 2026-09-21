@@ -153,8 +153,16 @@ CSP_POLICY = {
 TTS_PROVIDER = env("TTS_PROVIDER", default="mock")
 TTS_MODEL = env("TTS_MODEL", default="gpt-4o-mini-tts")
 TTS_VOICE = env("TTS_VOICE", default="fable")
-TTS_ENGINE_VERSION = "1"
+# Bump to invalidate every cached recording after changing the generation strategy
+# (new files are generated; old ones keep their QA status until replaced).
+TTS_ENGINE_VERSION = env("TTS_ENGINE_VERSION", default="2")
 TTS_BROWSER_FALLBACK = env("TTS_BROWSER_FALLBACK")
+# Serve only QA-approved recordings to learners (always True in production).
+TTS_REQUIRE_APPROVAL = env.bool("TTS_REQUIRE_APPROVAL", default=False)
+# Development convenience: generate a *mock* placeholder when a phrase has no audio.
+# Real providers are never called from a request.
+TTS_GENERATE_ON_REQUEST = env.bool("TTS_GENERATE_ON_REQUEST", default=False)
+TTS_AUDITION_VOICES = env.list("TTS_AUDITION_VOICES", default=["marin", "cedar", "fable"])
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 
 # --- Product rules -----------------------------------------------------------

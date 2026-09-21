@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.text import slugify
@@ -15,6 +16,14 @@ class Level(models.TextChoices):
     CLEAR = "clear", "Engleză britanică"
     NATURAL = "natural", "Engleză naturală"
     FAST = "fast", "Engleză rapidă"
+
+
+LEVEL_ORDER = {Level.CLEAR: 0, Level.NATURAL: 1, Level.FAST: 2}
+
+
+def levels_from(level: str) -> list[str]:
+    """The given level and every faster one (e.g. natural → [natural, fast])."""
+    return [lv for lv, rank in LEVEL_ORDER.items() if rank >= LEVEL_ORDER[level]]
 
 
 LEVEL_DESCRIPTIONS = {
@@ -143,6 +152,12 @@ class ListeningPhrase(TimeStamped):
         Topic, verbose_name="temă", on_delete=models.PROTECT, related_name="phrases"
     )
     active = models.BooleanField("activ", default=True)
+    in_pilot = models.BooleanField(
+        "corpus pilot",
+        default=False,
+        db_index=True,
+        help_text="Fraze folosite pentru QA audio înainte de generarea completă.",
+    )
     patterns = models.ManyToManyField(
         SpeechPattern, through="PhrasePattern", related_name="phrases", blank=True
     )
@@ -190,9 +205,30 @@ class PhrasePattern(models.Model):
     start_token = models.PositiveSmallIntegerField(editable=False, default=0)
     end_token = models.PositiveSmallIntegerField(editable=False, default=0)
     sounds_like = models.CharField(
-        "sună ca", max_length=80, blank=True, help_text="Opțional: IPA sau formă uzuală (ex. /tə/)."
+        "IPA / formă uzuală",
+        max_length=80,
+        blank=True,
+        help_text="IPA între /…/ (ex. /tə/) sau o formă informală consacrată (ex. gonna).",
     )
-    explanation_ro = models.CharField("explicație (RO)", max_length=300)
+    ro_approximation = models.CharField(
+        "aproximare pentru urechea românească",
+        max_length=80,
+        blank=True,
+        help_text="Ex. „digiu”. Nu este transcriere fonetică; în UI apare etichetată ca atare.",
+    )
+    explanation_ro = models.CharField(
+        "explicație generală (RO)",
+        max_length=300,
+        help_text="Tendința generală în vorbirea naturală, formulată prudent (poate / adesea).",
+    )
+    expected_from_level = models.CharField(
+        "așteptat de la nivelul",
+        max_length=10,
+        choices=Level.choices,
+        default=Level.CLEAR,
+        help_text="Cel mai lent nivel la care fenomenul apare de obicei. "
+        "Prezența reală se verifică pe fiecare variantă audio.",
+    )
 
     class Meta:
         ordering = ["phrase", "start_token"]
@@ -238,6 +274,9 @@ class PhrasePattern(models.Model):
     def covers(self, position: int) -> bool:
         return self.start_token <= position <= self.end_token
 
+    def expected_at(self, level: str) -> bool:
+        return LEVEL_ORDER[level] >= LEVEL_ORDER[self.expected_from_level]
+
 
 def audio_upload_path(instance: "AudioVariant", filename: str) -> str:
     ext = filename.rsplit(".", 1)[-1].lower()
@@ -246,6 +285,13 @@ def audio_upload_path(instance: "AudioVariant", filename: str) -> str:
 
 
 class AudioVariant(models.Model):
+    class QAStatus(models.TextChoices):
+        PENDING = "pending", "De verificat"
+        APPROVED = "approved", "Aprobat"
+        REJECTED = "rejected", "Respins"
+
+    HUMAN = "human"
+
     phrase = models.ForeignKey(
         ListeningPhrase, on_delete=models.CASCADE, related_name="audio_variants"
     )
@@ -256,8 +302,35 @@ class AudioVariant(models.Model):
         "fișier audio", upload_to=audio_upload_path, validators=[validate_audio_file], blank=True
     )
     duration_ms = models.PositiveIntegerField("durată (ms)", default=0)
+    duration_measured = models.BooleanField(
+        "durată măsurată",
+        default=False,
+        help_text="Adevărat dacă durata a fost citită din fișier. Altfel e aproximativă; "
+        "playerul din browser afișează durata exactă.",
+    )
     provider = models.CharField(
         "sursă", max_length=30, help_text="ex. openai, mock, human (înregistrare umană)"
+    )
+    model = models.CharField("model TTS", max_length=60, blank=True)
+    instructions = models.TextField("instrucțiuni trimise", blank=True)
+    speed = models.FloatField("viteză", null=True, blank=True)
+    engine_version = models.CharField("versiune motor TTS", max_length=20, blank=True)
+    qa_status = models.CharField(
+        "status QA",
+        max_length=10,
+        choices=QAStatus.choices,
+        default=QAStatus.PENDING,
+        db_index=True,
+    )
+    qa_notes = models.TextField("note QA", blank=True)
+    reviewed_at = models.DateTimeField("verificat la", null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="verificat de",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
     )
     cache_key = models.CharField(max_length=64, unique=True, blank=True, editable=False)
     generation_settings = models.JSONField(
@@ -272,12 +345,10 @@ class AudioVariant(models.Model):
         ordering = ["phrase", "level"]
         verbose_name = "variantă audio"
         verbose_name_plural = "variante audio"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["phrase", "level", "accent", "voice"], name="unique_audio_variant"
-            )
+        indexes = [
+            models.Index(fields=["phrase", "level", "accent"]),
+            models.Index(fields=["phrase", "level", "accent", "qa_status"]),
         ]
-        indexes = [models.Index(fields=["phrase", "level", "accent"])]
 
     def __str__(self) -> str:
         return f"{self.phrase} [{self.get_level_display()}, {self.accent.code}]"
@@ -293,5 +364,82 @@ class AudioVariant(models.Model):
         return self.provider == "mock"
 
     @property
+    def is_human(self) -> bool:
+        return self.provider == self.HUMAN
+
+    @property
+    def is_approved(self) -> bool:
+        return self.qa_status == self.QAStatus.APPROVED
+
+    @property
     def duration_seconds(self) -> float:
         return round(self.duration_ms / 1000, 1)
+
+
+class AudioVariantPattern(TimeStamped):
+    """Whether a phrase's speech pattern is actually audible in one specific recording.
+
+    `PhrasePattern` says what *usually* happens in natural speech; this row records what a
+    reviewer verified in *this* audio. Only `present` rows may be described to learners as
+    heard in the recording.
+    """
+
+    class Verification(models.TextChoices):
+        UNVERIFIED = "unverified", "Neverificat (doar așteptat)"
+        PRESENT = "present", "Prezent în înregistrare"
+        ABSENT = "absent", "Absent din înregistrare"
+
+    audio_variant = models.ForeignKey(
+        AudioVariant, on_delete=models.CASCADE, related_name="pattern_checks"
+    )
+    phrase_pattern = models.ForeignKey(
+        PhrasePattern, on_delete=models.CASCADE, related_name="audio_checks"
+    )
+    verification = models.CharField(
+        "verificare",
+        max_length=12,
+        choices=Verification.choices,
+        default=Verification.UNVERIFIED,
+    )
+    realisation = models.CharField(
+        "cum se aude aici",
+        max_length=120,
+        blank=True,
+        help_text="Ce se aude efectiv în această înregistrare (ex. /ɡɒʔ ə/).",
+    )
+    explanation_override_ro = models.CharField(
+        "explicație pentru această înregistrare",
+        max_length=300,
+        blank=True,
+        help_text="Opțional. Descrie exact ce se aude aici; altfel se folosește explicația "
+        "generală.",
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["audio_variant", "phrase_pattern__start_token"]
+        verbose_name = "tipar verificat în audio"
+        verbose_name_plural = "tipare verificate în audio"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["audio_variant", "phrase_pattern"], name="unique_variant_pattern"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.phrase_pattern} · {self.get_verification_display()}"
+
+    def clean(self) -> None:
+        if (
+            self.audio_variant_id
+            and self.phrase_pattern_id
+            and self.audio_variant.phrase_id != self.phrase_pattern.phrase_id
+        ):
+            raise ValidationError("Tiparul trebuie să aparțină aceleiași fraze ca varianta audio.")

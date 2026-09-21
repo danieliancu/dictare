@@ -16,6 +16,7 @@ from django.db.models import Prefetch
 from django.utils import timezone
 
 from apps.listening.models import PatternGroup, PhrasePattern, SpeechPattern
+from apps.listening.services.patterns import patterns_for_variant
 
 from ..models import PatternMastery
 
@@ -58,10 +59,11 @@ def recompute(user, pattern_ids: Iterable[int] | None = None) -> None:
             user=user, completed=True, phrase__phrase_patterns__pattern_id__in=pattern_ids
         )
         .distinct()
-        .select_related("phrase")
+        .select_related("phrase", "audio_variant")
         .prefetch_related(
             Prefetch("phrase__phrase_patterns", queryset=PhrasePattern.objects.all()),
             Prefetch("mistakes", queryset=AttemptMistake.objects.all()),
+            "audio_variant__pattern_checks",
         )
         .order_by("-completed_at")
     )
@@ -71,7 +73,9 @@ def recompute(user, pattern_ids: Iterable[int] | None = None) -> None:
     last_seen: dict[int, object] = {}
     for attempt in attempts:
         mistakes = list(attempt.mistakes.all())
-        for pp in attempt.phrase.phrase_patterns.all():
+        # Only patterns that apply to the recording the learner actually heard.
+        applied = patterns_for_variant(attempt.audio_variant, attempt.phrase, attempt.level)
+        for pp in (a.phrase_pattern for a in applied):
             if pp.pattern_id not in pattern_ids:
                 continue
             outcome, missed = exposure_outcome(attempt, pp, mistakes)

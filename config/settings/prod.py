@@ -16,4 +16,7 @@ SECURE_HSTS_PRELOAD = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "Lax"
-TTS_BROWSER_FALLBACK = env.bool("TTS_BROWSER_FALLBACK", default=False)
+# Production serves real, pre-generated, QA-approved audio only.
+TTS_BROWSER_FALLBACK = False
+TTS_GENERATE_ON_REQUEST = False
+TTS_REQUIRE_APPROVAL = env.bool("TTS_REQUIRE_APPROVAL", default=True)

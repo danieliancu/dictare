@@ -1,0 +1,16 @@
+<li class="explain-item{% if e.missed %} is-missed{% endif %}">
+  <div class="explain-item__top">
+    <span class="explain-item__frag" lang="en-GB">{{ e.pp.fragment }}</span>
+    {% if e.heard and e.realisation %}
+      <span class="explain-item__sounds" title="Cum se aude în această înregistrare">{% icon "arrow-right" %} {{ e.realisation }}</span>
+    {% elif e.pp.sounds_like %}
+      <span class="explain-item__sounds" title="IPA sau formă uzuală">{% icon "arrow-right" %} {{ e.pp.sounds_like }}</span>
+    {% endif %}
+    <span class="badge badge--muted">{{ e.pp.pattern.name_ro }}</span>
+    {% if e.missed %}<span class="badge badge--danger">aici ai ratat</span>{% endif %}
+  </div>
+  <p>{{ e.text }}</p>
+  {% if e.pp.ro_approximation %}
+    <p class="explain-item__approx">Aproximare pentru un vorbitor de română: „{{ e.pp.ro_approximation }}” <span class="muted">(nu este transcriere fonetică)</span></p>
+  {% endif %}
+</li>

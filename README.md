@@ -71,15 +71,24 @@ Principii:
 
 ### Audio
 
-`TTS_PROVIDER=mock` (implicit) generează un WAV determinist (fără voce reală), astfel încât tot
-flow-ul — player, waveform, cache, telemetrie — merge fără cheie API. În development,
-`TTS_BROWSER_FALLBACK=True` face ca playerul să citească fraza cu vocea `en-GB` a browserului
-(textul e cerut de la un endpoint separat doar la apăsarea Play).
+Generarea (comenzi, admin) e separată de selecție (request-urile cursanților):
 
-Cu `TTS_PROVIDER=openai` și `OPENAI_API_KEY`, audio-ul se generează o singură dată per
-combinație (text, accent, voce, nivel, viteză, provider, model, `TTS_ENGINE_VERSION`) și se
-salvează în `MEDIA_ROOT/audio/`. Înregistrările umane încărcate din admin (`provider = human`)
-au prioritate.
+- `apps/ai/services/tts.py`: provideri (`mock`, `openai`), prompturi per nivel, cache key,
+  erori tipizate, `generate_variant()`.
+- `apps/listening/services/audio.py`: `get_audio_variant()` — doar interogări în baza de date,
+  fără rețea.
+- `apps/listening/services/patterns.py`: ce tipare se pot explica pentru o anumită
+  înregistrare.
+- `apps/listening/services/qa.py`: aprobare / respingere.
+
+Nivelurile diferă în primul rând prin **modul de rostire** (instrucțiuni distincte), nu doar prin
+viteză: Clear (puțin mai lent, articulat, dar natural), Natural (conversațional, connected
+speech, forme slabe), Fast (fluent, reduceri realiste doar unde apar natural). Vitezele sunt
+moderate (0.95 / 1.0 / 1.08).
+
+`TTS_PROVIDER=mock` generează un WAV-placeholder (fără voce) pentru development și teste; în
+development playerul îl poate citi cu vocea en-GB a browserului. Audio mock nu poate fi aprobat
+și nu e servit în producție.
 
 ---
 
@@ -125,7 +134,7 @@ CREATE DATABASE dictare OWNER dictare;
 
 ```bash
 python manage.py migrate
-python manage.py seed_demo          # teme, accente, tipare, 73 de fraze, planuri, testimoniale,
+python manage.py seed_demo          # teme, accente, tipare, 75 de fraze, planuri, testimoniale,
                                     # audio mock și 2 utilizatori demo cu 3 săptămâni de istoric
 python manage.py createsuperuser    # pentru /admin/
 python manage.py runserver
@@ -140,21 +149,80 @@ Deschide http://localhost:8000. Conturi demo (doar pentru development):
 
 `seed_demo` este idempotent. Opțiuni: `--no-audio`, `--no-demo-user`.
 
-### Audio real (OpenAI)
+### Audio real (OpenAI) și QA
+
+**Audio-ul este conținutul educațional.** Un MP3 generat nu ajunge automat la cursanți: fiecare
+variantă începe ca `pending`, e ascultată, aprobată sau respinsă, iar tiparele de vorbire sunt
+verificate pe *acea* înregistrare.
+
+Configurare (`.env`, git-ignored — cheia se citește doar din environment):
 
 ```bash
-# în .env
 TTS_PROVIDER=openai
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=...
 TTS_MODEL=gpt-4o-mini-tts
-TTS_VOICE=fable
-
-python manage.py generate_audio                    # toate nivelurile, accentul implicit
-python manage.py generate_audio --level natural --limit 10
+TTS_VOICE=fable            # nu e definitivă până la audiția vocilor
+TTS_ENGINE_VERSION=2
+TTS_REQUIRE_APPROVAL=False # True în producție
 ```
 
-Fișierele existente sunt refolosite; schimbarea vocii, modelului sau a `TTS_ENGINE_VERSION`
-produce fișiere noi.
+**1. Alege vocea** (fișiere de comparat, nu intră în baza de date):
+
+```bash
+python manage.py audition_voices --dry-run
+python manage.py audition_voices --voices marin cedar fable
+```
+
+Rezultat în `media/qa/tts-audition/`: `<voce>/<nivel>/NN-fraza.mp3`, `manifest.json`
+(frază, voce, model, nivel, accent, instrucțiuni, viteză, fișier, timestamp) și `index.html`
+cu toate vocile și nivelurile una lângă alta. 11 fraze × 3 voci × 3 niveluri = 99 fișiere.
+
+**2. Generează corpusul pilot** (28 de fraze care acoperă forme slabe, would/could/did you,
+linking, contracții, eliziune, schwa, glottal T, întrebări, fraze scurte și lungi):
+
+```bash
+python manage.py generate_audio --pilot --voice marin --dry-run   # 28 × 3 = 84, fără API
+python manage.py generate_audio --pilot --voice marin --real-api
+python manage.py generate_audio --pilot --voice marin --real-api --level natural --limit 5
+```
+
+Comanda afișează numărul de generări înainte de a începe, sare peste fișierele deja generate
+cu aceleași setări (o rulare întreruptă se reia pur și simplu) și raportează fiecare eroare
+(frază, nivel, voce, tip: authentication / rate_limit / timeout / unavailable / bad_response).
+
+**3. Ascultă și aprobă** în `/admin/listening/audiovariant/review/`: Clear / Natural / Fast
+pentru fiecare frază, cu butoane Aprobă / Respinge și notă QA. Din lista de variante audio există
+și acțiunile „Aprobă / Respinge variantele selectate”. Audio mock nu poate fi aprobat.
+
+**4. Verifică tiparele pe înregistrare**: în pagina unei variante audio, pentru fiecare tipar
+marchează `prezent` / `absent` și, opțional, cum se aude (`/ɡɒʔ ə/`) și o explicație specifică.
+Pentru cursant:
+
+- `prezent` → apare la „În această înregistrare”;
+- `neverificat` dar așteptat la nivelul respectiv → apare doar ca „Tendință frecventă în
+  vorbirea naturală”, fără să pretindă că se aude;
+- `absent` sau neașteptat la acel nivel → nu apare.
+
+Greșelile și nivelul de stăpânire (mastery) se atribuie tot numai tiparelor valabile pentru
+înregistrarea ascultată.
+
+**5. Producție**: cu `TTS_REQUIRE_APPROVAL=True` se servesc doar înregistrări aprobate
+(prioritate: înregistrare umană aprobată → TTS aprobat), iar sesiunile aleg doar fraze care au
+audio aprobat. Request-urile cursanților nu generează niciodată audio și nu apelează OpenAI;
+dacă lipsește audio-ul, pagina afișează „Audio indisponibil”.
+
+**6. Generarea completă** (toate frazele) se face abia după alegerea vocii și validarea
+setărilor pe pilot: `python manage.py generate_audio --voice VOCEA_ALEASĂ --real-api`.
+
+Cache: fișierul e identificat prin hash-ul textului, providerului, modelului, vocii, accentului,
+instrucțiunilor complete, nivelului, vitezei și `TTS_ENGINE_VERSION`. Orice schimbare a
+prompturilor generează fișiere noi. **Schimbarea `TTS_ENGINE_VERSION` = regenerare audio**;
+variantele vechi își păstrează statusul QA până sunt înlocuite de cele noi, aprobate.
+
+Înregistrări umane: încarcă fișierul în admin (varianta audio, `provider = human`). O
+înregistrare umană aprobată are prioritate față de TTS pentru aceeași frază, nivel și accent.
+Accentele regionale (Londra, Nord, Scoția, Țara Galilor) sunt pregătite doar pentru înregistrări
+umane; sinteza vocală nu le redă fiabil.
 
 ## Variabile de mediu
 
@@ -170,8 +238,12 @@ produce fișiere noi.
 | `TTS_PROVIDER` | `mock` | `mock` sau `openai` |
 | `OPENAI_API_KEY` | — | |
 | `TTS_MODEL` | `gpt-4o-mini-tts` | |
-| `TTS_VOICE` | `fable` | |
-| `TTS_BROWSER_FALLBACK` | `True` în dev, `False` în prod | vocea browserului pentru audio mock |
+| `TTS_VOICE` | `fable` | vocea pentru `generate_audio` (de ales după audiție) |
+| `TTS_AUDITION_VOICES` | `marin,cedar,fable` | vocile pentru `audition_voices` |
+| `TTS_ENGINE_VERSION` | `2` | schimbarea lui forțează regenerarea audio |
+| `TTS_REQUIRE_APPROVAL` | `False` (dev), `True` (prod) | servește doar audio aprobat |
+| `TTS_GENERATE_ON_REQUEST` | `True` (dev), `False` (prod) | doar placeholder mock, niciodată OpenAI |
+| `TTS_BROWSER_FALLBACK` | `True` în dev, mereu `False` în prod | vocea browserului pentru audio mock, doar cu `DEBUG` |
 | `EMAIL_URL` | `consolemail://` | ex. `smtp+tls://user:pass@smtp.host:587` |
 | `DEFAULT_FROM_EMAIL` | `dictare.ro <salut@dictare.ro>` | |
 | `CACHE_URL` | `locmemcache://` | folosește Redis în producție: `redis://host:6379/1` |

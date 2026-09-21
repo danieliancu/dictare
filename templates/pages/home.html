@@ -13,8 +13,8 @@
   <div class="container hero__inner">
     <div class="hero__copy">
       <p class="eyebrow">Conversații reale. Un tu mai sigur pe tine.</p>
-      <h1 id="hero-title">Antrenează-ți urechea<br class="br-lg"> pentru engleza britanică<br class="br-lg"> adevărată.</h1>
-      <p class="lead">Înțelege engleza britanică vorbită fără să te bazezi pe subtitrări. Exersează cu audio realist, repetă expresii dificile, vezi transcrieri și urmărește-ți progresul prin exerciții create special pentru tine.</p>
+      <h1 id="hero-title">Antrenează-te<br class="br-lg"> pentru engleza britanică</h1>
+      <p class="lead">Începe să înțelegi engleza britanică vorbită fără să te bazezi pe subtitrări. Exersează cu audio realist, repetă expresii dificile, vezi transcrieri și urmărește-ți progresul prin exerciții create special pentru tine.</p>
       <div class="hero__ctas">
         <a class="btn btn--primary btn--lg" href="{% url 'practice:daily' %}">Începe să asculți {% icon "arrow-right" %}</a>
         <a class="btn btn--outline btn--lg" href="#cum-functioneaza">{% icon "play-circle" %} Vezi cum funcționează</a>
@@ -27,10 +27,6 @@
     </div>
 
     <div class="hero__visual">
-      <p class="hero__note hero__note--left hand" aria-hidden="true">
-        Engleză britanică reală. Progres real.
-        <svg viewBox="0 0 60 30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 4c10 18 30 22 52 16"/><path d="m47 14 7 6-8 4"/></svg>
-      </p>
 
       <div class="phone" role="img" aria-label="Aplicația dictare.ro pe telefon: ascultare zilnică, serie de 12 zile, exercițiul 1 din 10 cu player audio și transcriere.">
         <div class="phone__screen" inert>
@@ -60,8 +56,6 @@
           </div>
         </div>
       </div>
-
-      <p class="hero__note hero__note--right hand" aria-hidden="true">O ascultare mai bună.<br>Un tu mai puternic.</p>
       <img class="hero__london" src="{% static 'images/london.svg' %}" alt="" width="250" height="420" fetchpriority="low">
     </div>
   </div>
@@ -202,9 +196,5 @@
       <li>{% icon "check" %} Progres real și măsurabil</li>
     </ul>
   </div>
-  <p class="final-cta__note hand" aria-hidden="true">
-    Engleză reală. Oameni reali. Un viitor mai bun pentru tine.
-    <svg viewBox="0 0 80 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 10c20-6 45-8 74-4"/><path d="m69 2 7 4-6 5"/></svg>
-  </p>
 </section>
 {% endblock %}

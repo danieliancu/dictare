@@ -48,7 +48,7 @@ class TestPublicPages:
 
     def test_home_has_seo_and_design_copy(self, client, plans):
         html = client.get("/").content.decode()
-        assert "Antrenează-ți urechea" in html and "pentru engleza britanică" in html
+        assert "Antrenează-te" in html and "pentru engleza britanică" in html
         assert '<link rel="canonical"' in html
         assert 'property="og:title"' in html
         assert 'name="description"' in html
@@ -174,7 +174,7 @@ class TestPracticeFlow:
         )
         assert response.status_code == 200
         body = response.content.decode()
-        assert "Transcriere" in body and "De ce sună altfel" in body
+        assert "Transcriere" in body and "Tendință frecventă în vorbirea naturală" in body
         attempt.refresh_from_db()
         assert attempt.completed and attempt.score == 100
         assert response.headers["HX-Trigger"] == "progress-updated"

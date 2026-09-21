@@ -103,21 +103,20 @@
         {% if attempt.typed_answer %}<p class="your-answer">Ai scris: <q lang="en-GB">{{ attempt.typed_answer }}</q></p>{% endif %}
         {% if attempt.phrase.translation_ro %}<p class="translation">Înțeles: {{ attempt.phrase.translation_ro }}</p>{% endif %}
 
-        {% if explanations %}
+        {% if heard_explanations %}
           <div>
-            <p class="result__label">De ce sună altfel</p>
+            <p class="result__label">În această înregistrare</p>
             <ul class="explain-list">
-              {% for e in explanations %}
-                <li class="explain-item{% if e.missed %} is-missed{% endif %}">
-                  <div class="explain-item__top">
-                    <span class="explain-item__frag" lang="en-GB">{{ e.pp.fragment }}</span>
-                    {% if e.pp.sounds_like %}<span class="explain-item__sounds">{% icon "arrow-right" %} {{ e.pp.sounds_like }}</span>{% endif %}
-                    <span class="badge badge--muted">{{ e.pp.pattern.name_ro }}</span>
-                    {% if e.missed %}<span class="badge badge--danger">aici ai ratat</span>{% endif %}
-                  </div>
-                  <p>{{ e.pp.explanation_ro }}</p>
-                </li>
-              {% endfor %}
+              {% for e in heard_explanations %}{% include "components/explanation_item.html" %}{% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+        {% if tendency_explanations %}
+          <div>
+            <p class="result__label">Tendință frecventă în vorbirea naturală</p>
+            <p class="explain-note">Fenomene care apar des în engleza britanică vorbită. Nu au fost încă verificate în această înregistrare.</p>
+            <ul class="explain-list">
+              {% for e in tendency_explanations %}{% include "components/explanation_item.html" %}{% endfor %}
             </ul>
           </div>
         {% endif %}

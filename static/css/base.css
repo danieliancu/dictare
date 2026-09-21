@@ -162,13 +162,6 @@ a:hover {
   font-size: var(--text-sm);
 }
 
-.hand {
-  font-family: var(--font-hand);
-  font-weight: 500;
-  color: var(--muted-2);
-  line-height: 1.15;
-}
-
 .stack > * + * {
   margin-top: var(--stack, var(--space-4));
 }

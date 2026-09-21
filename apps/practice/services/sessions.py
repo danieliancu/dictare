@@ -11,9 +11,15 @@ from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from apps.ai.services.tts import TTSUnavailable, get_or_create_variant
+from apps.ai.services.tts import TTSError, generate_variant
 from apps.billing.services.entitlements import Entitlements, get_entitlements
-from apps.listening.models import Accent, Level, PhrasePattern
+from apps.listening.models import Accent, Level
+from apps.listening.services.audio import (
+    can_generate_on_request,
+    get_audio_variant,
+    phrase_ids_with_audio,
+)
+from apps.listening.services.patterns import pattern_for_position, patterns_for_variant
 from apps.progress.services import daily, mastery
 from apps.scoring.services import ScoreResult, Status, score_answer
 
@@ -156,12 +162,17 @@ def create_session(
         target_count=count,
         **owner.fields(),
     )
+    only_ids = None
+    if settings.TTS_REQUIRE_APPROVAL:
+        # Production: only phrases that already have an approved recording for this level.
+        only_ids = phrase_ids_with_audio(session.level, session.accent)
     phrases = choose_phrases(
         owner.user,
         count,
         topic=topic,
         pattern=pattern,
         max_difficulty=max_difficulty,
+        only_ids=only_ids,
         recommender=recommender,
         seed=str(session.id),
     )
@@ -222,15 +233,22 @@ def maybe_complete_session(session: PracticeSession) -> bool:
 
 
 def ensure_audio(attempt: ListeningAttempt, accent: Accent) -> None:
-    """Attach the cached audio variant for the attempt's level; never fails the page."""
-    if attempt.audio_variant_id and attempt.audio_variant.level == attempt.level:
+    """Attach the best servable recording for the attempt's level. Never calls a remote API.
+
+    Completed attempts keep the recording the learner actually heard, so the explanation
+    shown afterwards still matches that audio.
+    """
+    if attempt.completed and attempt.audio_variant_id:
         return
-    try:
-        variant = get_or_create_variant(attempt.phrase, attempt.level, accent)
-    except TTSUnavailable:
-        logger.warning("Audio unavailable for phrase %s", attempt.phrase_id)
-        variant = None
-    if variant is not None:
+    variant = get_audio_variant(attempt.phrase, attempt.level, accent)
+    if variant is None and can_generate_on_request():
+        try:
+            variant = generate_variant(attempt.phrase, attempt.level, accent, provider="mock")
+        except TTSError:
+            variant = None
+    if variant is None:
+        logger.info("No servable audio for phrase %s (%s)", attempt.phrase_id, attempt.level)
+    if attempt.audio_variant_id != (variant.pk if variant else None):
         attempt.audio_variant = variant
         attempt.save(update_fields=["audio_variant"])
 
@@ -277,29 +295,24 @@ def record_listening(
     attempt.save(update_fields=["listened_count", "replay_count", "time_spent_ms", "slowed_down"])
 
 
-def _pattern_for_position(patterns: list[PhrasePattern], position: int | None):
-    if position is None:
-        return None
-    covering = [pp for pp in patterns if pp.covers(position)]
-    if not covering:
-        return None
-    return min(covering, key=lambda pp: pp.end_token - pp.start_token).pattern_id
-
-
 def save_mistakes(attempt: ListeningAttempt, result: ScoreResult) -> None:
-    patterns = list(attempt.phrase.phrase_patterns.all())
-    AttemptMistake.objects.bulk_create(
-        AttemptMistake(
-            attempt=attempt,
-            position=w.position,
-            expected_word=w.text[:80] if w.status != Status.EXTRA else "",
-            typed_word=w.typed[:80],
-            mistake_type=w.status,
-            speech_pattern_id=_pattern_for_position(patterns, w.position),
-            severity=round(w.severity, 3),
+    """Store word mistakes, attributed only to patterns that apply to the recording heard."""
+    applied = patterns_for_variant(attempt.audio_variant, attempt.phrase, attempt.level)
+    mistakes = []
+    for w in result.mistakes:
+        pp = pattern_for_position(applied, w.position)
+        mistakes.append(
+            AttemptMistake(
+                attempt=attempt,
+                position=w.position,
+                expected_word=w.text[:80] if w.status != Status.EXTRA else "",
+                typed_word=w.typed[:80],
+                mistake_type=w.status,
+                speech_pattern_id=pp.pattern_id if pp else None,
+                severity=round(w.severity, 3),
+            )
         )
-        for w in result.mistakes
-    )
+    AttemptMistake.objects.bulk_create(mistakes)
 
 
 def check_attempt(owner: Owner, attempt: ListeningAttempt, typed: str) -> ScoreResult:
