@@ -1,0 +1,37 @@
+{# Audio player with waveform. Real audio is decoded client-side for the waveform peaks. #}
+{% if demo %}
+  <div class="player" aria-hidden="true">
+    <span class="player__play">{% icon "play" "icon icon-play" %}</span>
+    <div class="wave wave--demo">{% waveform_bars "hero" 34 %}</div>
+    <span class="player__time">0:00 / {{ duration|default:"0:04" }}</span>
+  </div>
+{% elif variant %}
+  <div class="player" data-player data-state="idle"
+       data-src="{{ variant.audio_file.url }}"
+       data-duration-ms="{{ variant.duration_ms }}"
+       data-listen-url="{% url 'practice:listen' attempt.pk %}"
+       {% if variant.is_placeholder and browser_fallback %}data-speech-url="{% url 'practice:speech' attempt.pk %}"{% endif %}>
+    <button class="player__play" type="button" data-play aria-label="Redă fraza">
+      {% icon "play" "icon icon-play" %}{% icon "pause" "icon icon-pause" %}<span class="spinner player__spinner" aria-hidden="true"></span>
+    </button>
+    <div class="wave" data-wave role="slider" tabindex="0" aria-label="Poziție în audio"
+         aria-valuemin="0" aria-valuemax="{{ variant.duration_seconds }}" aria-valuenow="0" aria-valuetext="0 secunde">
+      {% waveform_bars variant.cache_key 40 %}
+    </div>
+    <span class="player__time"><span data-current>0:00</span> / <span data-duration>{{ variant.duration_ms|mmss }}</span></span>
+  </div>
+  <div class="player__tools">
+    <button type="button" class="chip" data-replay>{% icon "replay" %} Ascultă din nou</button>
+    <button type="button" class="chip" data-slow aria-pressed="false">{% icon "slow" %} Mai încet</button>
+  </div>
+  {% if variant.is_placeholder %}
+    <p class="player__note">{% if browser_fallback %}Mod dezvoltare: fraza e citită de vocea en-GB a browserului.{% else %}Audio demonstrativ (fără voce reală).{% endif %}</p>
+  {% endif %}
+  <p class="sr-only" aria-live="polite" data-player-status></p>
+{% else %}
+  <div class="audio-error" role="alert">
+    {% icon "wifi-off" %}
+    <span>Audio indisponibil momentan. Încearcă din nou în câteva secunde.</span>
+    <a class="btn btn--sm btn--outline" href="{{ session_url }}?pas={{ human_position }}">Reîncarcă</a>
+  </div>
+{% endif %}

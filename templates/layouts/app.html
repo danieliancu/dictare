@@ -1,0 +1,19 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{% static 'css/pages.css' %}">{% endblock %}
+{% block body_class %}app-body{% if not user.is_authenticated %} app-body--guest{% endif %} {% block page_class %}{% endblock %}{% endblock %}
+{% block body %}
+  {% include "components/site_header.html" with app=True %}
+  <header class="app-topbar">
+    {% include "components/logo.html" with size="sm" %}
+    {% include "components/streak_badge.html" %}
+  </header>
+  <main id="main" class="app-main">
+    <div class="container">
+      {% if messages %}{% include "components/messages.html" %}{% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+  {% if user.is_authenticated %}{% include "components/bottom_nav.html" %}{% endif %}
+{% endblock %}

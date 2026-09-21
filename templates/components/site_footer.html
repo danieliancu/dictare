@@ -1,0 +1,23 @@
+<footer class="site-footer">
+  <div class="container site-footer__inner">
+    {% include "components/logo.html" with size="sm" %}
+    <p class="site-footer__tagline">Aude mai mult. Reușești mai mult.</p>
+    <ul class="site-footer__links" aria-label="Informații">
+      <li><a href="{% url 'core:about' %}">Despre noi</a></li>
+      <li><a href="{% url 'core:contact' %}">Contact</a></li>
+      <li><a href="{% url 'core:privacy' %}">Confidențialitate</a></li>
+      <li><a href="{% url 'core:terms' %}">Termeni</a></li>
+    </ul>
+    <ul class="socials" aria-label="Rețele sociale">
+      {% for name, icon_name, url in SOCIAL_LINKS %}
+        <li>
+          {% if url %}
+            <a href="{{ url }}" rel="noopener" target="_blank" aria-label="dictare.ro pe {{ name }} (se deschide într-o filă nouă)">{% icon icon_name %}</a>
+          {% else %}
+            <span class="socials__soon" role="img" title="{{ name }} — în curând" aria-label="{{ name }} — în curând">{% icon icon_name %}</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</footer>

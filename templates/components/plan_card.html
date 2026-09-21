@@ -1,0 +1,25 @@
+<article class="card plan{% if plan.code == 'pro' %} plan--featured{% endif %}" aria-labelledby="plan-{{ plan.code }}">
+  {% if plan.code == "pro" %}<span class="badge badge--pro plan__tag">Recomandat</span>{% endif %}
+  <div>
+    <h3 id="plan-{{ plan.code }}" style="font-size: 1.25rem">{{ plan.name }}</h3>
+    <p class="muted small" style="margin-top: 0.3rem">{{ plan.tagline }}</p>
+  </div>
+  <p class="plan__price">{% if plan.price_monthly %}£{{ plan.price_monthly }} <small>/ lună</small>{% else %}£0 <small>pentru totdeauna</small>{% endif %}</p>
+  <ul class="check-list">
+    {% for feature in plan.feature_list %}<li>{% icon "check" %}<span>{{ feature }}</span></li>{% endfor %}
+  </ul>
+  {% if plan.code == "free" %}
+    {% if user.is_authenticated %}
+      <a class="btn btn--outline btn--block" href="{% url 'practice:daily' %}">Continuă să asculți</a>
+    {% else %}
+      <a class="btn btn--outline btn--block" href="{% url 'practice:daily' %}">Începe gratuit</a>
+    {% endif %}
+  {% elif entitlements.is_pro %}
+    <span class="btn btn--soft btn--block" aria-disabled="true">{% icon "check" %} Planul tău actual</span>
+  {% elif checkout_available %}
+    <a class="btn btn--primary btn--block" href="{% url 'billing:pricing' %}">Treci la Pro</a>
+  {% else %}
+    <a class="btn btn--primary btn--block" href="{% url 'core:contact' %}?subiect=pro">Cere acces Pro</a>
+    <p class="plan__note">Plata online va fi disponibilă în curând. Până atunci, activăm Pro manual — scrie-ne.</p>
+  {% endif %}
+</article>

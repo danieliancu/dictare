@@ -1,0 +1,13 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Confirmare email · dictare.ro{% endblock %}
+{% block content %}
+{% if ok %}
+  <h1>Email confirmat</h1>
+  <p>Mulțumim! Adresa ta de email a fost confirmată.</p>
+  <a class="btn btn--primary btn--block" href="{% url 'practice:daily' %}">Continuă să asculți</a>
+{% else %}
+  <h1>Link invalid</h1>
+  <p>Linkul de confirmare a expirat sau a fost deja folosit. Din pagina contului poți cere unul nou.</p>
+  <a class="btn btn--primary btn--block" href="{% url 'accounts:account' %}">Mergi la cont</a>
+{% endif %}
+{% endblock %}

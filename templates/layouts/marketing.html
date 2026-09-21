@@ -1,0 +1,11 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block styles %}<link rel="stylesheet" href="{% static 'css/marketing.css' %}"><link rel="stylesheet" href="{% static 'css/pages.css' %}">{% endblock %}
+{% block body %}
+  {% include "components/site_header.html" with overlay=header_overlay %}
+  <main id="main">
+    {% if messages %}<div class="container" style="padding-top: 1rem">{% include "components/messages.html" %}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  {% include "components/site_footer.html" %}
+{% endblock %}

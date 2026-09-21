@@ -1,0 +1,16 @@
+{% extends "layouts/marketing.html" %}
+{% block title %}Pagina nu există · dictare.ro{% endblock %}
+{% block robots %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+<section class="container error-page">
+  <div class="stack">
+    <p class="code" aria-hidden="true">404</p>
+    <h1 style="font-size: 1.8rem">Pagina nu există</h1>
+    <p class="muted">Poate linkul e vechi sau a fost scris greșit.</p>
+    <div class="btn-row" style="justify-content: center">
+      <a class="btn btn--primary" href="{% url 'core:home' %}">Pagina principală</a>
+      <a class="btn btn--outline" href="{% url 'practice:daily' %}">Începe să asculți</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

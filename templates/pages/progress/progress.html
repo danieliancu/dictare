@@ -1,0 +1,14 @@
+{% extends "layouts/app.html" %}
+{% block title %}Progres · dictare.ro{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Progresul tău</h1>
+    <p>Cât de bine separi cuvintele în engleza britanică vorbită.</p>
+  </div>
+  <a class="btn btn--primary" href="{% url 'practice:daily' %}">{% icon "headphones" %} Ascultă azi</a>
+</div>
+<div id="dashboard" hx-get="{% url 'progress:progress' %}" hx-trigger="progress-updated from:body" hx-swap="innerHTML">
+  {% include "partials/progress/dashboard.html" %}
+</div>
+{% endblock %}

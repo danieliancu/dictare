@@ -1,0 +1,85 @@
+{% if not stats.has_data %}
+  <div class="card empty">
+    <div class="empty__icon">{% icon "chart-line" %}</div>
+    <h2 style="font-size: 1.25rem">Încă nu ai progres de afișat</h2>
+    <p>Fă primul exercițiu de azi. După fiecare frază îți arătăm scorul, ce ai ratat și ce tipare de pronunție îți dau bătăi de cap.</p>
+    <a class="btn btn--primary" href="{% url 'practice:daily' %}">Începe să asculți</a>
+  </div>
+{% else %}
+  <div class="grid grid--4 kpis">
+    <div class="card overall-card" style="padding: 1.25rem">
+      <p class="stat__label">Scor general de ascultare</p>
+      <div class="overall-card__ring">
+        <div class="donut-wrap">{% donut stats.overall_score 76 8 "Scor general: " %}<span class="donut-wrap__label" style="font-size: 1.15rem">{{ stats.overall_score }}%</span></div>
+        {% if stats.recent_improvement is not None %}
+          <p class="{% if stats.recent_improvement >= 0 %}trend-up{% else %}trend-down{% endif %}"><strong>{% if stats.recent_improvement >= 0 %}+{% endif %}{{ stats.recent_improvement }}</strong> puncte<br><span class="muted">față de săptămâna trecută</span></p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card stat">
+      <span class="stat__label">Serie curentă</span>
+      <span class="stat__value">{{ stats.streak.current }} {{ stats.streak.current|pluralize:"zi,zile" }}</span>
+      <span class="stat__hint">Cea mai lungă: {{ stats.streak.longest }} · {{ stats.streak.practice_days }} zile de practică</span>
+    </div>
+    <div class="card stat">
+      <span class="stat__label">Expresii finalizate</span>
+      <span class="stat__value">{{ stats.phrases_completed }}</span>
+      <span class="stat__hint">{{ stats.exercises_completed }} exerciții în total</span>
+    </div>
+    <div class="card stat">
+      <span class="stat__label">Azi</span>
+      <span class="stat__value">{{ stats.today_count }} / {{ stats.daily_goal }}</span>
+      <div class="bar" role="progressbar" aria-label="Obiectivul de azi" aria-valuemin="0" aria-valuemax="{{ stats.daily_goal }}" aria-valuenow="{{ stats.today_count }}"><span class="bar__fill" style="--value: {% widthratio stats.today_count stats.daily_goal 100 %}%"></span></div>
+    </div>
+  </div>
+
+  <div class="grid grid--4 kpis" style="margin-top: 1.25rem">
+    <div class="card stat"><span class="stat__label">Precizie medie pe cuvinte</span><span class="stat__value">{{ stats.average_accuracy }}%</span></div>
+    <div class="card stat"><span class="stat__label">Scor mediu (ultimele 30)</span><span class="stat__value">{{ stats.average_score }}%</span></div>
+    <div class="card stat"><span class="stat__label">Dependență de transcriere</span><span class="stat__value">{{ stats.transcript_dependency }}%</span><span class="stat__hint">transcriere văzută înainte de verificare</span></div>
+    <div class="card stat"><span class="stat__label">Reluări pe frază</span><span class="stat__value">{{ stats.replay_frequency }}</span><span class="stat__hint">{{ stats.slowed_down_share }}% din fraze ascultate mai încet</span></div>
+  </div>
+
+  <div class="grid grid--2" style="margin-top: 1.25rem">
+    <section class="card card--pad" aria-labelledby="chart-title">
+      <div class="card__head"><h2 id="chart-title" class="card__title">Ultimele 14 zile</h2><span class="muted small">exerciții / zi</span></div>
+      <div class="chart" style="--cols: {{ stats.days|length }}" role="img" aria-label="Exerciții pe zi în ultimele 14 zile">
+        {% for d in stats.days %}
+          <div class="chart__col" title="{{ d.day|date:'j M' }}: {{ d.count }} exerciții{% if d.avg_score is not None %}, scor mediu {{ d.avg_score }}%{% endif %}">
+            <span class="chart__bar{% if not d.count %} is-empty{% endif %}" style="--h: {% widthratio d.count max_day 100 %}%"></span>
+            <small>{{ d.day|date:"j" }}</small>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card card--pad" aria-labelledby="groups-title">
+      <div class="card__head"><h2 id="groups-title" class="card__title">Exercițiile tale</h2><a class="small" href="{% url 'progress:mistakes' %}">Greșeli</a></div>
+      {% include "components/progress_rows.html" %}
+    </section>
+  </div>
+
+  <section class="card card--pad" style="margin-top: 1.25rem" aria-labelledby="patterns-title">
+    <div class="card__head">
+      <h2 id="patterns-title" class="card__title">Progres pe fiecare tipar</h2>
+      {% if not entitlements.advanced_progress %}<span class="badge badge--pro">Detalii complete în Pro</span>{% endif %}
+    </div>
+    <div style="overflow-x: auto">
+      <table class="pattern-table">
+        <thead><tr><th scope="col">Tipar</th><th scope="col">Stăpânire</th><th scope="col" class="num">%</th>{% if entitlements.advanced_progress %}<th scope="col" class="num">Expuneri</th><th scope="col" class="num">Ratări</th>{% endif %}</tr></thead>
+        <tbody>
+          {% for m in stats.patterns %}
+            {% if entitlements.advanced_progress or forloop.counter <= 5 %}
+            <tr>
+              <th scope="row" style="font-weight: 500">{{ m.pattern.name_ro }}</th>
+              <td><span class="bar{% if m.mastery < 40 %} bar--danger{% elif m.mastery < 70 %} bar--warning{% endif %}"><span class="bar__fill" style="--value: {{ m.mastery }}%"></span></span></td>
+              <td class="num">{{ m.mastery }}%</td>
+              {% if entitlements.advanced_progress %}<td class="num">{{ m.exposures }}</td><td class="num">{{ m.misses }}</td>{% endif %}
+            </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endif %}

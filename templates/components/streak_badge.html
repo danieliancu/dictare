@@ -1,0 +1,12 @@
+{# Refreshed via htmx whenever an exercise is completed (progress-updated event). #}
+<div class="streak-slot" {% if user.is_authenticated %}hx-get="{% url 'progress:streak' %}{% if pill %}?pill=1{% endif %}" hx-trigger="progress-updated from:body" hx-swap="outerHTML"{% endif %}>
+  {% if user.is_authenticated %}
+    {% if pill %}
+      <span class="streak streak--pill" title="Serie de {{ user_streak.current }} zile">{% icon "flame" %}{{ user_streak.current }}<span class="sr-only"> zile consecutive</span></span>
+    {% else %}
+      <span class="streak">{% icon "flame" %}<span class="streak__text"><strong>Ascultare zilnică</strong><span>Serie de {{ user_streak.current }} {{ user_streak.current|pluralize:"zi,zile" }}</span></span></span>
+    {% endif %}
+  {% else %}
+    <a class="streak" href="{% url 'accounts:signup' %}">{% icon "flame" %}<span class="streak__text"><strong>Ascultare zilnică</strong><span>Salvează-ți seria</span></span></a>
+  {% endif %}
+</div>

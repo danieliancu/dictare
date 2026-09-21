@@ -1,0 +1,13 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block robots %}<meta name="robots" content="noindex">{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{% static 'css/pages.css' %}">{% endblock %}
+{% block body %}
+  {% include "components/site_header.html" %}
+  <main id="main" class="auth">
+    <div class="card auth__card">
+      {% if messages %}{% include "components/messages.html" %}{% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+{% endblock %}

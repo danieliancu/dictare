@@ -1,0 +1,81 @@
+{% extends "layouts/app.html" %}
+{% block title %}Exerciții · dictare.ro{% endblock %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block description %}Alege o temă și exersează ascultarea englezei britanice: conversații, muncă, cumpărături, transport, la medic și engleză rapidă.{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Exerciții</h1>
+    <p>Ascultă, scrie ce auzi și vezi imediat ce ai ratat.</p>
+  </div>
+  {% if not user.is_authenticated and remaining is not None %}
+    <span class="badge">Încercare gratuită: {{ remaining }} exerciții rămase</span>
+  {% endif %}
+</div>
+
+<section class="daily-card" aria-labelledby="daily-title">
+  <div>
+    <h2 id="daily-title">Ascultare zilnică</h2>
+    {% if user.is_authenticated %}
+      <p>{{ today_count }} din {{ daily_goal }} exerciții azi · serie de {{ user_streak.current }} {{ user_streak.current|pluralize:"zi,zile" }}</p>
+      <div class="bar" role="progressbar" aria-label="Progres azi" aria-valuemin="0" aria-valuemax="{{ daily_goal }}" aria-valuenow="{{ today_count }}"><span class="bar__fill" style="--value: {% widthratio today_count daily_goal 100 %}%"></span></div>
+    {% else %}
+      <p>{{ remaining|default:5 }} fraze scurte, alese pentru început. Fără cont, fără card.</p>
+    {% endif %}
+  </div>
+  <a class="btn btn--lg" href="{% url 'practice:daily' %}">{% icon "headphones" %} {% if user.is_authenticated and today_count %}Continuă{% else %}Începe să asculți{% endif %}</a>
+</section>
+
+{% if user.is_authenticated %}
+  <h2 class="section-title">Antrenament personalizat {% if not entitlements.personalized_training %}<span class="badge badge--pro">Pro</span>{% endif %}</h2>
+  <div class="card card--pad pro-lock">
+    <div style="flex: 1 1 280px">
+      <p><strong>Fraze alese după greșelile tale.</strong></p>
+      <p class="muted small">Prioritizăm tiparele pe care le ratezi cel mai des: forme slabe, sunete legate, reduceri.</p>
+    </div>
+    {% if entitlements.personalized_training %}
+      <form method="post" action="{% url 'practice:personalized' %}">{% csrf_token %}<button class="btn btn--primary" type="submit">{% icon "target" %} Pornește antrenamentul</button></form>
+    {% else %}
+      <a class="btn btn--outline-blue" href="{% url 'billing:pricing' %}">Vezi planul Pro</a>
+    {% endif %}
+  </div>
+{% endif %}
+
+<h2 class="section-title">Teme</h2>
+{% if topics %}
+  <ul class="topic-grid">
+    {% for topic in topics %}
+      <li>
+        {% if user.is_authenticated %}
+          <form method="post" action="{% url 'practice:topic' topic.slug %}">
+            {% csrf_token %}
+            <button class="topic" type="submit">
+              <span class="tile tile--{% cycle 'blue' 'violet' 'green' 'teal' 'red' %}">{% icon topic.icon %}</span>
+              <span><strong>{{ topic.name_ro }}</strong><small lang="en-GB">{{ topic.name_en }}</small></span>
+            </button>
+          </form>
+        {% else %}
+          <a class="topic" href="{% url 'practice:daily' %}">
+            <span class="tile tile--{% cycle 'blue' 'violet' 'green' 'teal' 'red' %}">{% icon topic.icon %}</span>
+            <span><strong>{{ topic.name_ro }}</strong><small lang="en-GB">{{ topic.name_en }}</small></span>
+          </a>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  {% if not user.is_authenticated %}<p class="muted small" style="margin-top: 1rem">Temele se deblochează după ce îți creezi un cont gratuit. Până atunci, încearcă ascultarea zilnică.</p>{% endif %}
+{% else %}
+  <div class="card empty">
+    <div class="empty__icon">{% icon "headphones" %}</div>
+    <h2 style="font-size: 1.2rem">Încă nu avem exerciții</h2>
+    <p>Revino în curând — adăugăm fraze noi în fiecare săptămână.</p>
+  </div>
+{% endif %}
+
+{% if groups %}
+  <h2 class="section-title">Exercițiile tale <a class="small" href="{% url 'progress:mistakes' %}">Vezi greșelile</a></h2>
+  <div class="card card--pad">
+    {% include "components/progress_rows.html" %}
+  </div>
+{% endif %}
+{% endblock %}

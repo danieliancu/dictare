@@ -1,0 +1,7 @@
+<ol class="step-list" id="step-list"{% if oob %} hx-swap-oob="true"{% endif %} aria-label="Pașii exercițiului">
+        <li class="{% if state == 'listen' %}is-current{% elif state == 'result' %}is-done{% endif %}">Ascultă fraza</li>
+        <li class="{% if state == 'listen' %}is-current{% elif state == 'result' %}is-done{% endif %}">Scrie ce ai auzit</li>
+        <li class="{% if state == 'result' %}is-done{% endif %}">Verifică</li>
+        <li class="{% if state == 'result' %}is-current{% endif %}">Înțelege de ce</li>
+        <li>Repetă</li>
+      </ol>

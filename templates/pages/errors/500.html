@@ -1,0 +1,23 @@
+{% load static %}<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Eroare · dictare.ro</title>
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'css/components.css' %}">
+  <link rel="stylesheet" href="{% static 'css/pages.css' %}">
+</head>
+<body>
+  <main class="error-page" style="padding-inline: 1rem">
+    <div class="stack">
+      <p class="code" aria-hidden="true">500</p>
+      <h1 style="font-size: 1.8rem">Ceva n-a mers</h1>
+      <p class="muted">Am fost anunțați și ne uităm. Încearcă din nou în câteva minute.</p>
+      <p><a class="btn btn--primary" href="/">Pagina principală</a></p>
+    </div>
+  </main>
+</body>
+</html>

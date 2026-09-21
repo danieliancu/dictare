@@ -1,0 +1,15 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Autentificare · dictare.ro{% endblock %}
+{% block content %}
+<h1>Bine ai revenit</h1>
+<p>Continuă de unde ai rămas.</p>
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="form-error" role="alert">{% icon "alert" %}{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  {% for field in form %}{% include "components/field.html" %}{% endfor %}
+  <div class="auth__row"><a href="{% url 'accounts:password_reset' %}">Ai uitat parola?</a></div>
+  <input type="hidden" name="next" value="{{ next }}">
+  <button class="btn btn--primary btn--lg btn--block" type="submit">Autentifică-te</button>
+</form>
+<p class="auth__alt">Nu ai cont? <a href="{% url 'accounts:signup' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Creează unul gratuit</a></p>
+{% endblock %}

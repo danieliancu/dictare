@@ -1,0 +1,13 @@
+{% extends "layouts/marketing.html" %}
+{% block title %}Sesiune expirată · dictare.ro{% endblock %}
+{% block robots %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+<section class="container error-page">
+  <div class="stack">
+    <p class="code" aria-hidden="true">403</p>
+    <h1 style="font-size: 1.8rem">Sesiunea a expirat</h1>
+    <p class="muted">Din motive de securitate, reîncarcă pagina și încearcă din nou.</p>
+    <p><a class="btn btn--primary" href="{% url 'core:home' %}">Pagina principală</a></p>
+  </div>
+</section>
+{% endblock %}

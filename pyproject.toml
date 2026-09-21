@@ -1,0 +1,24 @@
+[project]
+name = "dictare"
+version = "1.0.0"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["**/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ"]
+ignore = ["DJ001"]
+
+[tool.ruff.lint.per-file-ignores]
+"apps/listening/seed_data.py" = ["E501"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["tests.py", "test_*.py"]
+testpaths = ["apps", "tests"]
+markers = ["e2e: browser-based responsive smoke tests (need playwright)"]
+addopts = "-q"
+filterwarnings = ["ignore:No directory at:UserWarning"]

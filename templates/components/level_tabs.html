@@ -1,0 +1,24 @@
+{# Listening level switch. `demo` renders the static version used in the hero mockup. #}
+{% if demo %}
+  <div class="level-tabs" aria-hidden="true">
+    <span class="level-tab is-active">Engleză britanică</span>
+    <span class="level-tab">Engleză naturală</span>
+    <span class="level-tab">Engleză rapidă</span>
+  </div>
+{% else %}
+  <div class="level-tabs" role="group" aria-label="Nivel de ascultare">
+    {% for level in levels %}
+      {% if attempt and not attempt.completed %}
+        <button type="button" class="level-tab{% if level.active %} is-active{% endif %}"
+                aria-pressed="{% if level.active %}true{% else %}false{% endif %}"
+                title="{{ level.description }}{% if level.locked %} (Pro){% endif %}"
+                hx-post="{% url 'practice:level' attempt.pk %}" hx-vals='{"level": "{{ level.value }}"}'
+                hx-target="#exercise" hx-swap="outerHTML">
+          {{ level.label }}{% if level.locked %}{% icon "lock" %}<span class="sr-only"> (disponibil în Pro)</span>{% endif %}
+        </button>
+      {% else %}
+        <span class="level-tab{% if level.active %} is-active{% endif %}" aria-current="{% if level.active %}true{% else %}false{% endif %}">{{ level.label }}</span>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endif %}

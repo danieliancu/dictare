@@ -1,0 +1,63 @@
+{% with url_name=request.resolver_match.url_name %}
+<header class="site-header{% if overlay %} site-header--overlay{% endif %}" data-sticky-header>
+  <div class="container site-header__inner">
+    {% include "components/logo.html" %}
+
+    {% if user.is_authenticated %}
+      <nav class="site-nav" aria-label="Navigare principală">
+        <a href="{% url 'practice:daily' %}" {% if url_name == 'session' or url_name == 'daily' %}aria-current="page"{% endif %}>Ascultă</a>
+        <a href="{% url 'practice:hub' %}" {% if url_name == 'hub' %}aria-current="page"{% endif %}>Exerciții</a>
+        <a href="{% url 'progress:mistakes' %}" {% if url_name == 'mistakes' %}aria-current="page"{% endif %}>Greșeli</a>
+        <a href="{% url 'progress:progress' %}" {% if url_name == 'progress' %}aria-current="page"{% endif %}>Progres</a>
+      </nav>
+      <div class="site-header__actions">
+        {% include "components/streak_badge.html" with pill=True %}
+        <a class="user-chip" href="{% url 'accounts:account' %}" aria-label="Contul meu ({{ user.email }})">{{ user.display_name|slice:":1"|upper }}</a>
+      </div>
+    {% else %}
+      <nav class="site-nav" aria-label="Navigare principală">
+        <a href="{% url 'core:home' %}#functionalitati">Funcționalități</a>
+        <a href="{% url 'practice:hub' %}" {% if url_name == 'hub' %}aria-current="page"{% endif %}>Exerciții</a>
+        <a href="{% url 'core:home' %}#progres">Progres</a>
+        <a href="{% url 'billing:pricing' %}" {% if url_name == 'pricing' %}aria-current="page"{% endif %}>Prețuri</a>
+      </nav>
+      <div class="site-header__actions">
+        <a class="site-header__login" href="{% url 'accounts:login' %}">Autentifică-te</a>
+        <a class="btn btn--primary" href="{% url 'practice:daily' %}">Începe acum</a>
+      </div>
+      {% if not app %}<a class="btn btn--primary btn--sm header-cta-mobile" href="{% url 'practice:daily' %}">Începe</a>{% endif %}
+    {% endif %}
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" data-nav-toggle>
+      <span class="sr-only">Meniu</span>
+      <span class="nav-toggle__open">{% icon "menu" %}</span>
+      <span class="nav-toggle__close">{% icon "x" %}</span>
+    </button>
+  </div>
+
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Meniu mobil">
+    <div class="container">
+      <ul class="mobile-menu__list">
+        {% if user.is_authenticated %}
+          <li><a href="{% url 'practice:daily' %}">{% icon "headphones" %} Ascultă</a></li>
+          <li><a href="{% url 'practice:hub' %}">{% icon "list" %} Exerciții</a></li>
+          <li><a href="{% url 'progress:mistakes' %}">{% icon "target" %} Greșeli</a></li>
+          <li><a href="{% url 'progress:progress' %}">{% icon "chart-line" %} Progres</a></li>
+          <li><a href="{% url 'accounts:account' %}">{% icon "user" %} Contul meu</a></li>
+        {% else %}
+          <li><a href="{% url 'core:home' %}#functionalitati">Funcționalități</a></li>
+          <li><a href="{% url 'practice:hub' %}">Exerciții</a></li>
+          <li><a href="{% url 'core:home' %}#progres">Progres</a></li>
+          <li><a href="{% url 'billing:pricing' %}">Prețuri</a></li>
+        {% endif %}
+      </ul>
+      {% if not user.is_authenticated %}
+        <div class="mobile-menu__actions">
+          <a class="btn btn--primary btn--lg btn--block" href="{% url 'practice:daily' %}">Începe să asculți</a>
+          <a class="btn btn--outline btn--lg btn--block" href="{% url 'accounts:login' %}">Autentifică-te</a>
+        </div>
+      {% endif %}
+    </div>
+  </nav>
+</header>
+{% endwith %}

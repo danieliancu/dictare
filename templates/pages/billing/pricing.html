@@ -1,0 +1,25 @@
+{% extends "layouts/marketing.html" %}
+{% block title %}Prețuri · dictare.ro{% endblock %}
+{% block description %}Planul gratuit: 10 exerciții pe zi cu engleză britanică clară. Pro: nelimitat, engleză naturală și rapidă, antrenament personalizat.{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container">
+    <div class="section-head section-head--center">
+      <p class="eyebrow">Prețuri</p>
+      <h1 style="font-size: var(--text-3xl)">Începe gratuit. Treci la Pro când vrei mai mult.</h1>
+      <p>Fără card la înscriere. Planul gratuit rămâne gratuit.</p>
+    </div>
+    <div class="plans">
+      {% for plan in plans %}{% include "components/plan_card.html" %}{% endfor %}
+    </div>
+    <div class="container--narrow" style="margin: 3rem auto 0">
+      <h2 style="font-size: 1.3rem; margin-bottom: 1rem">Ce înseamnă nivelurile?</h2>
+      <ul class="check-list">
+        <li>{% icon "check" %}<span><strong>Engleză britanică</strong> — articulare clară, ritm puțin mai lent. Inclus gratuit.</span></li>
+        <li>{% icon "check" %}<span><strong>Engleză naturală</strong> — ritm normal, cuvinte legate și forme slabe, ca în conversațiile reale.</span></li>
+        <li>{% icon "check" %}<span><strong>Engleză rapidă</strong> — ritm nativ, reduceri („gonna”, „d'you”), exact ce auzi la muncă sau în pub.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+{% endblock %}

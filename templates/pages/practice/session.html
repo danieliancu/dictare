@@ -1,0 +1,28 @@
+{% extends "layouts/app.html" %}
+{% load static %}
+{% block title %}{{ session.get_kind_display }} · dictare.ro{% endblock %}
+{% block page_class %}practice-page{% endblock %}
+{% block scripts %}<script src="{% static 'js/player.js' %}" defer></script>{% endblock %}
+{% block content %}
+<div class="practice-layout">
+  <div class="practice-card">
+    <h1 class="sr-only">{{ session.get_kind_display }}{% if session.topic %}: {{ session.topic.name_ro }}{% elif session.pattern %}: {{ session.pattern.name_ro }}{% endif %}</h1>
+    {% include "partials/practice/exercise.html" %}
+  </div>
+
+  <aside class="practice-aside" aria-label="Despre exercițiu">
+    <div class="card card--pad">
+      <p class="eyebrow">{{ session.get_kind_display }}</p>
+      <h2 class="card__title" style="margin: 0.35rem 0 1rem">{% if session.topic %}{{ session.topic.name_ro }}{% elif session.pattern %}{{ session.pattern.name_ro }}{% else %}Exercițiile de azi{% endif %}</h2>
+      {% include "components/step_list.html" %}
+    </div>
+    <div class="card card--pad">
+      <h2 class="card__title" style="margin-bottom: 0.5rem">Sfat</h2>
+      <p class="muted small">Nu te opri la primul cuvânt pe care nu-l prinzi. Scrie ce ai înțeles și lasă pauze — transcrierea îți arată exact ce ai ratat și de ce.</p>
+    </div>
+    {% if session.accent %}
+      <p class="muted small">Accent: <strong>{{ session.accent.name_ro }}</strong></p>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

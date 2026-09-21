@@ -1,0 +1,44 @@
+{% load static %}<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}dictare.ro · Antrenează-ți urechea pentru engleza britanică{% endblock %}</title>
+  <meta name="description" content="{% block description %}Exerciții scurte de dictare cu audio britanic realist: asculți, scrii ce ai auzit, vezi transcrierea și înțelegi de ce unele cuvinte sunt greu de prins.{% endblock %}">
+  {% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+  <link rel="canonical" href="{% block canonical %}{{ SITE_URL }}{{ request.path }}{% endblock %}">
+  <meta name="theme-color" content="#1f6fe5">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="dictare.ro">
+  <meta property="og:locale" content="ro_RO">
+  <meta property="og:title" content="{% block og_title %}dictare.ro · Antrenează-ți urechea pentru engleza britanică{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}Înțelege engleza britanică vorbită fără subtitrări. Exerciții scurte de ascultare, transcrieri și progres real.{% endblock %}">
+  <meta property="og:url" content="{{ SITE_URL }}{{ request.path }}">
+  <meta property="og:image" content="{{ SITE_URL }}{% static 'images/og-image.png' %}">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="{% static 'images/favicon.svg' %}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@600;700&family=Caveat:wght@500&family=Source+Serif+4:opsz,wght@8..60,400&display=swap">
+
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'css/layout.css' %}">
+  <link rel="stylesheet" href="{% static 'css/components.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  {% block styles %}{% endblock %}
+
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "historyCacheSize": 0, "refreshOnHistoryMiss": true, "defaultSwapStyle": "innerHTML", "scrollIntoViewOnBoost": false, "responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true}, {"code": "422", "swap": true}, {"code": "[45]..", "swap": false, "error": true}]}'>
+  <script src="{% static 'js/vendor/htmx.min.js' %}" defer></script>
+  <script src="{% static 'js/app.js' %}" defer></script>
+  {% block scripts %}{% endblock %}
+  {% block structured_data %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <a class="skip-link" href="#main">Sari la conținut</a>
+  {% block body %}{% endblock %}
+  <div class="toast-region" id="toasts" role="status" aria-live="polite"></div>
+</body>
+</html>

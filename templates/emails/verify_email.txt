@@ -1,0 +1,9 @@
+Salut{% if user.first_name %}, {{ user.first_name }}{% endif %}!
+
+Mulțumim că ți-ai făcut cont pe dictare.ro. Confirmă adresa de email aici:
+
+{{ url }}
+
+Dacă nu tu ți-ai creat contul, poți ignora acest mesaj.
+
+Echipa dictare.ro

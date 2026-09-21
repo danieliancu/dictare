@@ -1,0 +1,210 @@
+{% extends "layouts/marketing.html" %}
+{% load static %}
+{% block canonical %}{{ SITE_URL }}/{% endblock %}
+{% block structured_data %}
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "WebApplication", "name": "dictare.ro", "url": "{{ SITE_URL }}/", "applicationCategory": "EducationalApplication", "operatingSystem": "Web", "inLanguage": "ro", "description": "Exerciții de ascultare pentru engleza britanică: asculți, scrii ce ai auzit, vezi transcrierea și înțelegi vorbirea naturală.", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "GBP"}}
+</script>
+{% endblock %}
+{% block content %}
+
+{# ============ HERO ============ #}
+<section class="hero" aria-labelledby="hero-title">
+  <div class="container hero__inner">
+    <div class="hero__copy">
+      <p class="eyebrow">Conversații reale. Un tu mai sigur pe tine.</p>
+      <h1 id="hero-title">Antrenează-ți urechea<br class="br-lg"> pentru engleza britanică<br class="br-lg"> adevărată.</h1>
+      <p class="lead">Înțelege engleza britanică vorbită fără să te bazezi pe subtitrări. Exersează cu audio realist, repetă expresii dificile, vezi transcrieri și urmărește-ți progresul prin exerciții create special pentru tine.</p>
+      <div class="hero__ctas">
+        <a class="btn btn--primary btn--lg" href="{% url 'practice:daily' %}">Începe să asculți {% icon "arrow-right" %}</a>
+        <a class="btn btn--outline btn--lg" href="#cum-functioneaza">{% icon "play-circle" %} Vezi cum funcționează</a>
+      </div>
+      <ul class="hero__perks">
+        <li>{% icon "headphones" %} Audio autentic britanic</li>
+        <li>{% icon "chart" %} Progres real și măsurabil</li>
+        <li>{% icon "uk-flag" "flag" %} Creat pentru viața reală</li>
+      </ul>
+    </div>
+
+    <div class="hero__visual">
+      <p class="hero__note hero__note--left hand" aria-hidden="true">
+        Engleză britanică reală. Progres real.
+        <svg viewBox="0 0 60 30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 4c10 18 30 22 52 16"/><path d="m47 14 7 6-8 4"/></svg>
+      </p>
+
+      <div class="phone" role="img" aria-label="Aplicația dictare.ro pe telefon: ascultare zilnică, serie de 12 zile, exercițiul 1 din 10 cu player audio și transcriere.">
+        <div class="phone__screen" inert>
+          <div class="phone__status" aria-hidden="true">
+            <span>9:41</span><span class="phone__notch"></span>
+            <span class="phone__icons"><span class="sig"></span><span class="bat"></span></span>
+          </div>
+          <div class="app">
+            <div class="app__header">
+              <span class="brand">{% icon "logo" "brand__mark" %}<span>dictare.ro</span></span>
+              <span class="streak">{% icon "flame" %}<span class="streak__text"><strong>Ascultare zilnică</strong><span>Serie de {{ demo.streak }} zile</span></span></span>
+            </div>
+            {% include "components/level_tabs.html" with demo=True %}
+            <div class="exercise-head">
+              <span>Ascultă și tastează ce auzi</span>
+              <span class="exercise-head__count">{{ demo.position }} din {{ demo.total }}</span>
+            </div>
+            {% include "components/audio_player.html" with demo=True duration=demo.duration %}
+            <div class="answer__input">Scrie aici ce ai auzit...</div>
+            <span class="btn reveal-btn btn--block">{% icon "eye" %} Afișează transcrierea</span>
+            <div class="explain">
+              <p class="explain__title">{% icon "bulb" %} {{ demo.explanation_title }}</p>
+              <div class="explain__rows">
+                {% for left, right in demo.rows %}<span>{{ left }}</span>{% icon "arrow-right" %}<span>{{ right }}</span>{% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="hero__note hero__note--right hand" aria-hidden="true">O ascultare mai bună.<br>Un tu mai puternic.</p>
+      <img class="hero__london" src="{% static 'images/london.svg' %}" alt="" width="250" height="420" fetchpriority="low">
+    </div>
+  </div>
+</section>
+
+{# ============ FEATURES ============ #}
+<section class="features" id="functionalitati" aria-labelledby="features-title">
+  <div class="container">
+    <h2 id="features-title" class="sr-only">Funcționalități</h2>
+    <ul class="features__grid">
+      <li class="feature">{% icon "headphones" %}<h3>Ascultă mai întâi</h3><p>Aude expresia înainte de a vedea textul.</p></li>
+      <li class="feature">{% icon "document" %}<h3>Vezi transcrierea</h3><p>Descoperă propoziția exactă după ce încerci.</p></li>
+      <li class="feature">{% icon "brain" %}<h3>Înțelege vorbirea naturală</h3><p>Învață reduceri, legături între cuvinte și forme slabe.</p></li>
+      <li class="feature">{% icon "chart" %}<h3>Urmărește-ți greșelile</h3><p>Revino asupra tiparelor pe care le ratezi cel mai des.</p></li>
+    </ul>
+  </div>
+</section>
+
+{# ============ HOW IT WORKS ============ #}
+<section class="band-section" id="cum-functioneaza" aria-labelledby="how-title">
+  <div class="container">
+    <div class="band how">
+      <div class="how__intro">
+        <h2 id="how-title">Cum funcționează</h2>
+        <p>Patru pași simpli pentru rezultate mai bune.</p>
+      </div>
+      <ol class="how__steps">
+        <li class="how-step"><span class="how-step__num" aria-hidden="true">1</span>{% icon "headphones" %}<h3>Ascultă</h3><p>Aude o expresie reală de engleză britanică.</p></li>
+        <li class="how-step"><span class="how-step__num" aria-hidden="true">2</span>{% icon "keyboard" %}<h3>Tastează ce ai auzit</h3><p>Scrie propoziția cu propriile tale cuvinte.</p></li>
+        <li class="how-step"><span class="how-step__num" aria-hidden="true">3</span>{% icon "eye" %}<h3>Vezi transcrierea</h3><p>Descoperă propoziția exactă și notele utile.</p></li>
+        <li class="how-step"><span class="how-step__num" aria-hidden="true">4</span>{% icon "refresh" %}<h3>Repetă și îmbunătățește</h3><p>Ascultă din nou, observă tiparele și obține rezultate mai bune.</p></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+{# ============ PERSONALISED PRACTICE ============ #}
+<section class="band-section" id="progres" aria-labelledby="personal-title">
+  <div class="container">
+    <div class="band personal">
+      <div class="personal__intro">
+        <h2 id="personal-title">Exerciții personalizate</h2>
+        <p class="sub">Concentrează-te pe ceea ce contează pentru tine.</p>
+        <p>Alege teme de exerciții, urmărește-ți progresul și construiește o înțelegere mai bună a englezei britanice reale.</p>
+        <a class="btn btn--outline-blue" href="{% url 'practice:hub' %}">Explorează temele de exerciții {% icon "arrow-right" %}</a>
+      </div>
+
+      <div class="card card--pad">
+        <div class="card__head">
+          <h3 class="card__title">Exercițiile tale</h3>
+          <a class="small" href="{% if user.is_authenticated %}{% url 'progress:progress' %}{% else %}{% url 'practice:hub' %}{% endif %}">Vezi tot</a>
+        </div>
+        {% include "components/progress_rows.html" %}
+        {% if overview.demo %}<p class="demo-note" style="margin-top: 0.9rem">Exemplu. După primele exerciții vei vedea aici progresul tău real.</p>{% endif %}
+      </div>
+
+      <div class="card card--pad overall-card">
+        <h3 class="card__title">Progres general</h3>
+        <div class="overall-card__ring">
+          <div class="donut-wrap">{% donut overview.overall 84 9 "Progres general: " %}<span class="donut-wrap__label">{{ overview.overall }}%</span></div>
+          <p>{% if overview.overall >= 60 %}Progres excelent!{% else %}Fiecare zi contează!{% endif %}<br>Continuă să asculți.</p>
+        </div>
+        <div class="overall-card__done">
+          {% icon "chart" %}
+          <div><strong>{{ overview.phrases_completed }}</strong><span>Expresii finalizate</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ============ TESTIMONIAL ============ #}
+{% if testimonials %}
+<section class="band-section" aria-labelledby="testimonial-title">
+  <div class="container">
+    <h2 id="testimonial-title" class="sr-only">Ce spun cursanții</h2>
+    <div class="band testimonial" data-carousel>
+      <div class="testimonial__slides" aria-live="polite">
+        {% for t in testimonials %}
+          <figure class="testimonial__slide" data-slide aria-roledescription="slide" aria-label="{{ forloop.counter }} din {{ testimonials|length }}">
+            {% if t.avatar %}<img class="avatar" src="{{ t.avatar.url }}" alt="" width="104" height="104" loading="lazy">{% else %}<span class="avatar" aria-hidden="true">{{ t.initials }}</span>{% endif %}
+            <blockquote>
+              <p>„{{ t.quote }}”</p>
+              <footer>
+                <span>{{ t.author_name }}</span>
+                {% if t.location %}<span>{% include "components/flag.html" with code=t.country_code %} {{ t.location }}</span>{% endif %}
+              </footer>
+            </blockquote>
+          </figure>
+        {% endfor %}
+      </div>
+      {% if testimonials|length > 1 %}
+        <div class="testimonial__controls">
+          <div class="testimonial__arrows">
+            <button class="round-btn" type="button" data-prev aria-label="Testimonialul anterior">{% icon "chevron-left" %}</button>
+            <button class="round-btn" type="button" data-next aria-label="Testimonialul următor">{% icon "chevron-right" %}</button>
+          </div>
+          <div class="dots">
+            {% for t in testimonials %}<button type="button" data-dot aria-label="Testimonialul {{ forloop.counter }}"></button>{% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ============ PRICING ============ #}
+{% if plans %}
+<section class="section" id="preturi" aria-labelledby="pricing-title">
+  <div class="container">
+    <div class="section-head section-head--center">
+      <p class="eyebrow">Prețuri</p>
+      <h2 id="pricing-title">Începe gratuit. Treci la Pro când vrei mai mult.</h2>
+      <p>Fără card la înscriere. Planul gratuit rămâne gratuit.</p>
+    </div>
+    <div class="plans">
+      {% for plan in plans %}{% include "components/plan_card.html" %}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ============ FINAL CTA ============ #}
+<section class="final-cta" aria-labelledby="cta-title">
+  <svg class="final-cta__waves" viewBox="0 0 1440 320" preserveAspectRatio="none" aria-hidden="true">
+    <path fill="#dfe9fc" d="M0 210c180-40 360-60 540-30s360 90 540 70 270-70 360-90v160H0z"/>
+    <path fill="#d4e2fb" opacity=".7" d="M0 260c220 20 420-40 640-30s420 60 800 10v80H0z"/>
+  </svg>
+  <div class="container final-cta__inner">
+    <p class="eyebrow">Un tu mai sigur pe tine</p>
+    <h2 id="cta-title">Nu mai depinde de subtitrări.</h2>
+    <p class="lead">Construiește încredere în înțelegerea englezei britanice, cu exerciții scurte, pas cu pas.</p>
+    <a class="btn btn--primary btn--lg" href="{% url 'practice:daily' %}">Începe gratuit {% icon "arrow-right" %}</a>
+    <ul class="final-cta__benefits">
+      <li>{% icon "check" %} Nu este necesar card de credit</li>
+      <li>{% icon "check" %} Funcționează pe web și mobil</li>
+      <li>{% icon "check" %} Progres real și măsurabil</li>
+    </ul>
+  </div>
+  <p class="final-cta__note hand" aria-hidden="true">
+    Engleză reală. Oameni reali. Un viitor mai bun pentru tine.
+    <svg viewBox="0 0 80 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 10c20-6 45-8 74-4"/><path d="m69 2 7 4-6 5"/></svg>
+  </p>
+</section>
+{% endblock %}

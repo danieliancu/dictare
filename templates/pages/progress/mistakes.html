@@ -1,0 +1,72 @@
+{% extends "layouts/app.html" %}
+{% block title %}Greșeli · dictare.ro{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Greșelile tale</h1>
+    <p>Tiparele de pronunție care îți scapă cel mai des. Exersează-le țintit.</p>
+  </div>
+</div>
+
+{% if not problem_patterns %}
+  <div class="card empty">
+    <div class="empty__icon">{% icon "target" %}</div>
+    <h2 style="font-size: 1.25rem">Nicio greșeală încă</h2>
+    <p>După câteva exerciții vei vedea aici ce tipare îți dau bătăi de cap: forme slabe, sunete legate, reduceri rapide.</p>
+    <a class="btn btn--primary" href="{% url 'practice:daily' %}">Fă primul exercițiu</a>
+  </div>
+{% else %}
+  <div class="grid grid--2">
+    {% for m in problem_patterns %}
+      <article class="card problem">
+        <div>
+          <div class="problem__head">
+            <h2 style="font-size: 1.05rem">{{ m.pattern.name_ro }} <span class="muted small" lang="en-GB" style="font-weight: 500">· {{ m.pattern.name_en }}</span></h2>
+            <span class="problem__rate {% if m.miss_rate >= 60 %}trend-down{% endif %}">{{ m.miss_rate }}%</span>
+          </div>
+          <span class="bar{% if m.miss_rate >= 60 %} bar--danger{% elif m.miss_rate >= 30 %} bar--warning{% else %} bar--success{% endif %}" role="progressbar" aria-label="Rată de ratare {{ m.pattern.name_ro }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ m.miss_rate }}"><span class="bar__fill" style="--value: {{ m.miss_rate }}%"></span></span>
+          <p>Ratat în {{ m.misses }} din {{ m.exposures }} fraze · stăpânire {{ m.mastery }}%. {{ m.pattern.description_ro }}</p>
+        </div>
+        <form method="post" action="{% url 'practice:pattern' m.pattern.slug %}">
+          {% csrf_token %}
+          <button class="btn btn--outline-blue" type="submit">{% icon "target" %} Exersează acest tipar</button>
+        </form>
+      </article>
+    {% endfor %}
+  </div>
+
+  {% if frequent_words %}
+    <h2 class="section-title">Cuvinte ratate des</h2>
+    <ul class="word-cloud">
+      {% for w in frequent_words %}<li class="badge badge--danger" lang="en-GB">{{ w.expected_word|lower }} · {{ w.n }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+
+  <h2 class="section-title">Istoric
+    {% if history_limited %}<span class="badge badge--pro">Ultimele {{ history_days }} zile · istoric complet în Pro</span>{% endif %}
+  </h2>
+  {% if page.object_list %}
+    <ul class="history">
+      {% for mk in page.object_list %}
+        <li>
+          <div>
+            <strong lang="en-GB">{% if mk.expected_word %}{{ mk.expected_word }}{% else %}{{ mk.typed_word }}{% endif %}</strong>
+            <span class="muted small">— {{ mk.get_mistake_type_display|lower }}{% if mk.typed_word and mk.expected_word %}: ai scris „<span lang="en-GB">{{ mk.typed_word }}</span>”{% endif %}</span>
+            <div class="phrase" lang="en-GB">{{ mk.attempt.phrase.text }}</div>
+          </div>
+          {% if mk.speech_pattern %}<span class="badge badge--muted">{{ mk.speech_pattern.name_ro }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if page.has_other_pages %}
+      <nav class="pagination" aria-label="Pagini istoric">
+        {% if page.has_previous %}<a href="?pagina={{ page.previous_page_number }}">{% icon "chevron-left" %}<span class="sr-only">Pagina anterioară</span></a>{% endif %}
+        <span>Pagina {{ page.number }} din {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?pagina={{ page.next_page_number }}">{% icon "chevron-right" %}<span class="sr-only">Pagina următoare</span></a>{% endif %}
+      </nav>
+    {% endif %}
+  {% else %}
+    <p class="muted">Nicio greșeală în perioada afișată.</p>
+  {% endif %}
+{% endif %}
+{% endblock %}

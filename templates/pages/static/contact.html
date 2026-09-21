@@ -1,0 +1,15 @@
+{% extends "layouts/marketing.html" %}
+{% block title %}Contact · dictare.ro{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container prose">
+    <h1>Contact</h1>
+    {% if request.GET.subiect == "pro" %}
+      <div class="alert" style="margin-bottom: 1.5rem">{% icon "star" %}<span>Vrei acces Pro? Scrie-ne de pe adresa contului tău și îl activăm manual până pornește plata online.</span></div>
+    {% endif %}
+    <p>Ai o întrebare, o sugestie de frază sau ai găsit o greșeală într-o explicație? Ne bucurăm să aflăm.</p>
+    <p>Email: <a href="mailto:salut@dictare.ro">salut@dictare.ro</a></p>
+    <p>Răspundem de obicei în 1–2 zile lucrătoare.</p>
+  </div>
+</section>
+{% endblock %}

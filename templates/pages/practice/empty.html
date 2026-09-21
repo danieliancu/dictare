@@ -1,0 +1,10 @@
+{% extends "layouts/app.html" %}
+{% block title %}Nu există exerciții · dictare.ro{% endblock %}
+{% block content %}
+<div class="card empty" style="max-width: 560px; margin-inline: auto">
+  <div class="empty__icon">{% icon "headphones" %}</div>
+  <h1 style="font-size: 1.4rem">Nu există exerciții disponibile</h1>
+  <p>Nu am găsit fraze pentru această sesiune. Încearcă altă temă sau revino puțin mai târziu.</p>
+  <a class="btn btn--primary" href="{% url 'practice:hub' %}">Înapoi la exerciții</a>
+</div>
+{% endblock %}

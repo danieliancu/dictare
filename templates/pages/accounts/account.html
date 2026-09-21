@@ -1,0 +1,50 @@
+{% extends "layouts/app.html" %}
+{% block title %}Contul meu · dictare.ro{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Contul meu</h1>
+    <p>{{ user.email }}</p>
+  </div>
+  <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="btn btn--outline" type="submit">{% icon "logout" %} Deconectează-te</button></form>
+</div>
+
+<div class="grid grid--2">
+  <section class="card card--pad" aria-labelledby="profile-title">
+    <h2 id="profile-title" class="card__title" style="margin-bottom: 1rem">Profil</h2>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% for field in form %}{% include "components/field.html" %}{% endfor %}
+      <button class="btn btn--primary" type="submit" style="margin-top: 1.25rem">Salvează</button>
+    </form>
+  </section>
+
+  <div class="grid" style="align-content: start">
+    <section class="card card--pad" aria-labelledby="plan-title">
+      <div class="card__head">
+        <h2 id="plan-title" class="card__title">Plan</h2>
+        <span class="badge{% if entitlements.is_pro %} badge--pro{% endif %}">{{ entitlements.plan_name }}</span>
+      </div>
+      <ul class="check-list small">
+        <li>{% icon "check" %}<span>{% if entitlements.daily_limit %}{{ entitlements.daily_limit }} exerciții pe zi{% else %}Exerciții nelimitate{% endif %}</span></li>
+        <li>{% icon "check" %}<span>Niveluri: {% if entitlements.is_pro %}britanică, naturală, rapidă{% else %}engleză britanică clară{% endif %}</span></li>
+        <li>{% icon "check" %}<span>{% if entitlements.personalized_training %}Antrenament personalizat{% else %}Progres de bază{% endif %}</span></li>
+      </ul>
+      {% if not entitlements.is_pro %}<a class="btn btn--outline-blue btn--block" style="margin-top: 1rem" href="{% url 'billing:pricing' %}">Vezi planul Pro</a>{% endif %}
+    </section>
+
+    <section class="card card--pad" aria-labelledby="security-title">
+      <h2 id="security-title" class="card__title" style="margin-bottom: 0.75rem">Securitate</h2>
+      <p class="small muted" style="margin-bottom: 1rem">
+        Email: {% if user.email_verified %}<span class="badge badge--success">confirmat</span>{% else %}<span class="badge badge--warning">neconfirmat</span>{% endif %}
+      </p>
+      <div class="btn-row">
+        <a class="btn btn--outline btn--sm" href="{% url 'accounts:password_change' %}">Schimbă parola</a>
+        {% if not user.email_verified %}
+          <form method="post" action="{% url 'accounts:verify_resend' %}">{% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit">Retrimite emailul de confirmare</button></form>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

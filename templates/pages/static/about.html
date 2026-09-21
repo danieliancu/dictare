@@ -1,0 +1,21 @@
+{% extends "layouts/marketing.html" %}
+{% block title %}Despre noi · dictare.ro{% endblock %}
+{% block description %}dictare.ro ajută românii din Marea Britanie să înțeleagă engleza britanică vorbită, prin exerciții scurte de dictare.{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container prose">
+    <h1>Despre dictare.ro</h1>
+    <p>Mulți dintre noi citim și înțelegem engleza fără probleme. Dar când un britanic vorbește repede, cuvintele se lipesc între ele și nu mai știm unde se termină unul și unde începe următorul.</p>
+    <p>dictare.ro există pentru exact această problemă. Nu este un curs de gramatică și nici un traducător. Este un antrenament de ascultare: auzi o frază reală, scrii ce ai auzit, vezi transcrierea exactă și afli de ce anumite cuvinte au sunat altfel decât te așteptai.</p>
+    <h2>Cum lucrăm</h2>
+    <ul>
+      <li>Fraze naturale, din viața de zi cu zi în Marea Britanie: la muncă, la GP, în autobuz, la school gate.</li>
+      <li>Explicații scurte, în română, despre forme slabe, sunete legate, reduceri și accente.</li>
+      <li>Progres măsurat pe tiparele care te încurcă pe tine, nu pe o programă generică.</li>
+    </ul>
+    <h2>Despre accente</h2>
+    <p>Engleza britanică nu are un singur accent. Pornim de la Standard Southern British și Modern RP, apoi adăugăm treptat înregistrări cu alte accente (Londra, Nord, Scoția, Țara Galilor). Acestea necesită vorbitori reali — vocile sintetice nu le redau încă fiabil.</p>
+    <p><a class="btn btn--primary" href="{% url 'practice:daily' %}">Începe să asculți</a></p>
+  </div>
+</section>
+{% endblock %}

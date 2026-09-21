@@ -1,0 +1,15 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Creează cont · dictare.ro{% endblock %}
+{% block content %}
+<h1>Creează cont gratuit</h1>
+<p>Îți salvăm progresul, seria zilnică și tiparele pe care le ratezi. Fără card.</p>
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="form-error" role="alert">{% icon "alert" %}{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  {% for field in form %}{% include "components/field.html" %}{% endfor %}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  <button class="btn btn--primary btn--lg btn--block" type="submit">Creează cont</button>
+</form>
+<p class="auth__alt">Ai deja cont? <a href="{% url 'accounts:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Autentifică-te</a></p>
+<p class="auth__alt small">Continuând, ești de acord cu <a href="{% url 'core:terms' %}">Termenii</a> și <a href="{% url 'core:privacy' %}">Politica de confidențialitate</a>.</p>
+{% endblock %}

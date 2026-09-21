@@ -1,0 +1,150 @@
+{# The swappable exercise unit. Every htmx action targets #exercise with outerHTML. #}
+<div id="exercise" class="app" data-exercise data-state="{{ state }}" aria-busy="false">
+  {% include "components/level_tabs.html" %}
+  {% if level_locked_message %}
+    <div class="alert alert--warning level-lock-note" role="status">{% icon "lock" %}<span>{{ level_locked_message }} <a href="{% url 'billing:pricing' %}">Vezi planurile</a></span></div>
+  {% endif %}
+
+  {% if state == "summary" %}
+    <section class="summary" aria-labelledby="summary-title">
+      <div class="donut-wrap">{% donut average 104 10 "Scor mediu: " %}<span class="donut-wrap__label">{{ average }}%</span></div>
+      <h2 id="summary-title" tabindex="-1" data-autofocus style="font-size: 1.4rem">Sesiune terminată!</h2>
+      <p class="muted">Ai ascultat {{ total }} {{ total|pluralize:"frază,fraze" }}. Revizuiește-le sau continuă cu altă temă.</p>
+      <ul class="summary__list">
+        {% for a in attempts %}
+          <li><a href="{{ session_url }}?pas={{ forloop.counter }}" lang="en-GB">{{ a.phrase.text }}</a><span class="badge {% if a.score >= 80 %}badge--success{% elif a.score >= 50 %}badge--warning{% else %}badge--danger{% endif %}">{{ a.score }}%</span></li>
+        {% endfor %}
+      </ul>
+      {% if is_anonymous %}
+        <div class="nudge" style="width: 100%; text-align: left">
+          <strong>Creează cont pentru a-ți salva progresul.</strong>
+          <span class="muted small">Păstrăm exercițiile de azi, seria zilnică și tiparele pe care le ratezi.</span>
+          <a class="btn btn--primary btn--block" href="{% url 'accounts:signup' %}?next={{ session_url|urlencode }}">Creează cont gratuit</a>
+        </div>
+      {% else %}
+        <div class="btn-row" style="justify-content: center">
+          <a class="btn btn--primary" href="{% url 'practice:hub' %}">Alege altă temă</a>
+          <a class="btn btn--outline" href="{% url 'progress:progress' %}">Vezi progresul</a>
+        </div>
+      {% endif %}
+    </section>
+
+  {% elif state == "limit" %}
+    <section class="summary" aria-labelledby="limit-title">
+      <div class="empty__icon">{% icon "trophy" %}</div>
+      {% if is_anonymous %}
+        <h2 id="limit-title" tabindex="-1" data-autofocus style="font-size: 1.35rem">Ai terminat exercițiile de probă</h2>
+        <p class="muted">Creează cont pentru a-ți salva progresul și a continua cu 10 exerciții pe zi, gratuit.</p>
+        <a class="btn btn--primary btn--lg btn--block" href="{% url 'accounts:signup' %}">Creează cont gratuit</a>
+        <a class="btn btn--ghost btn--block" href="{% url 'accounts:login' %}">Am deja cont</a>
+      {% else %}
+        <h2 id="limit-title" tabindex="-1" data-autofocus style="font-size: 1.35rem">Gata pentru azi!</h2>
+        <p class="muted">Ai terminat cele {{ entitlements.daily_limit }} exerciții incluse azi în planul {{ entitlements.plan_name }}. Revino mâine ca să-ți păstrezi seria.</p>
+        <a class="btn btn--primary btn--block" href="{% url 'billing:pricing' %}">Vezi planul Pro</a>
+        <a class="btn btn--ghost btn--block" href="{% url 'progress:progress' %}">Vezi progresul de azi</a>
+      {% endif %}
+    </section>
+
+  {% else %}
+    <div class="exercise-head">
+      <span>{% if state == "result" %}Rezultat{% else %}Ascultă și tastează ce auzi{% endif %}</span>
+      <span class="exercise-head__count">{{ human_position }} din {{ total }}</span>
+    </div>
+    <div class="bar session-progress" role="progressbar" aria-label="Progres sesiune" aria-valuemin="0" aria-valuemax="{{ total }}" aria-valuenow="{{ completed_count }}">
+      <span class="bar__fill" style="--value: {{ progress_pct }}%"></span>
+    </div>
+
+    {% include "components/audio_player.html" %}
+
+    {% if state == "listen" %}
+      <form class="answer" method="post" action="{% url 'practice:check' attempt.pk %}"
+            hx-post="{% url 'practice:check' attempt.pk %}" hx-target="#exercise" hx-swap="outerHTML"
+            hx-sync="this:drop">
+        {% csrf_token %}
+        <label class="sr-only" for="answer-{{ attempt.pk }}">Ce ai auzit?</label>
+        <textarea class="answer__input" id="answer-{{ attempt.pk }}" name="answer" rows="2" maxlength="500"
+                  lang="en-GB" autocomplete="off" autocapitalize="sentences" spellcheck="false"
+                  placeholder="Scrie aici ce ai auzit..." data-answer
+                  {% if form_error %}aria-invalid="true" aria-describedby="answer-error"{% endif %}>{{ typed|default:"" }}</textarea>
+        {% if form_error %}<p class="form-error" id="answer-error" role="alert">{% icon "alert" %}{{ form_error }}</p>{% endif %}
+        <div class="action-bar">
+          <button class="btn btn--primary btn--lg btn--block" type="submit">
+            <span class="hide-while-loading">Verifică</span><span class="htmx-indicator spinner" aria-hidden="true"></span>
+          </button>
+          <button class="btn reveal-btn btn--block" type="button" data-reveal
+                  hx-post="{% url 'practice:reveal' attempt.pk %}" hx-include="closest form" hx-sync="closest form:drop"
+                  hx-target="#exercise" hx-swap="outerHTML">
+            {% icon "eye" %} Afișează transcrierea
+          </button>
+          <p class="kbd-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> verifică · <kbd>Ctrl</kbd> + <kbd>Space</kbd> redă</p>
+        </div>
+      </form>
+
+    {% elif state == "result" %}
+      <section class="result" aria-labelledby="result-title">
+        <div class="result__score">
+          <div class="donut-wrap">{% donut attempt.score 64 7 "Scor: " %}<span class="donut-wrap__label">{{ attempt.score }}</span></div>
+          <div class="result__verdict">
+            <strong id="result-title" tabindex="-1" {% if just_checked %}data-autofocus{% endif %}>{{ verdict }}</strong>
+            <span>Cuvinte corecte: {{ attempt.word_accuracy }}%{% if attempt.revealed_before_check %} · transcriere văzută înainte de verificare{% endif %}</span>
+          </div>
+        </div>
+
+        <div>
+          <p class="result__label">Transcriere</p>
+          <p class="transcript" lang="en-GB">
+            {% for w in words %}<span class="w w--{{ w.status }}">{{ w.text }}{% if w.status != "correct" %}<span class="sr-only"> ({{ w.label }}{% if w.typed and w.status == "incorrect" %}, ai scris „{{ w.typed }}”{% endif %})</span>{% endif %}{% if w.typed and w.status == "incorrect" %}<span class="w__typed" aria-hidden="true">{{ w.typed }}</span>{% endif %}</span>{% endfor %}
+          </p>
+          <div class="legend" aria-hidden="true" style="margin-top: 8px">
+            <span><i class="l-correct"></i>corect</span><span><i class="l-missing"></i>lipsă / greșit</span><span><i class="l-extra"></i>în plus</span><span><i class="l-order"></i>altă ordine</span><span><i class="l-minor"></i>formă contrasă / ortografie</span>
+          </div>
+        </div>
+
+        {% if attempt.typed_answer %}<p class="your-answer">Ai scris: <q lang="en-GB">{{ attempt.typed_answer }}</q></p>{% endif %}
+        {% if attempt.phrase.translation_ro %}<p class="translation">Înțeles: {{ attempt.phrase.translation_ro }}</p>{% endif %}
+
+        {% if explanations %}
+          <div>
+            <p class="result__label">De ce sună altfel</p>
+            <ul class="explain-list">
+              {% for e in explanations %}
+                <li class="explain-item{% if e.missed %} is-missed{% endif %}">
+                  <div class="explain-item__top">
+                    <span class="explain-item__frag" lang="en-GB">{{ e.pp.fragment }}</span>
+                    {% if e.pp.sounds_like %}<span class="explain-item__sounds">{% icon "arrow-right" %} {{ e.pp.sounds_like }}</span>{% endif %}
+                    <span class="badge badge--muted">{{ e.pp.pattern.name_ro }}</span>
+                    {% if e.missed %}<span class="badge badge--danger">aici ai ratat</span>{% endif %}
+                  </div>
+                  <p>{{ e.pp.explanation_ro }}</p>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        {% if show_signup_nudge %}
+          <div class="nudge">
+            <strong>Creează cont pentru a-ți salva progresul.</strong>
+            <span class="muted small">Îți păstrăm seria zilnică și tiparele pe care le ratezi.</span>
+            <a class="btn btn--outline-blue btn--block" href="{% url 'accounts:signup' %}?next={{ session_url|urlencode }}">Creează cont gratuit</a>
+          </div>
+        {% endif %}
+
+        <div class="action-bar">
+          {% if next_position %}
+            <a class="btn btn--primary btn--lg btn--block" href="{{ session_url }}?pas={{ next_position }}"
+               hx-get="{{ session_url }}?pas={{ next_position }}" hx-target="#exercise" hx-swap="outerHTML" hx-push-url="true">
+              Următorul {% icon "arrow-right" %}
+            </a>
+          {% else %}
+            <a class="btn btn--primary btn--lg btn--block" href="{{ session_url }}"
+               hx-get="{{ session_url }}" hx-target="#exercise" hx-swap="outerHTML" hx-push-url="true">
+              Vezi rezumatul {% icon "arrow-right" %}
+            </a>
+          {% endif %}
+        </div>
+      </section>
+    {% endif %}
+  {% endif %}
+</div>
+{% if request.htmx and not request.htmx.history_restore_request %}{% include "components/step_list.html" with oob=True %}{% endif %}

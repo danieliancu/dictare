@@ -1,0 +1,10 @@
+<ul class="progress-list">
+  {% for g in groups %}
+    <li class="progress-row">
+      <span class="tile tile--{{ g.color }}">{% icon g.icon %}</span>
+      <span class="progress-row__label">{{ g.label }}</span>
+      <span class="bar" role="progressbar" aria-label="{{ g.label }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ g.value }}"><span class="bar__fill" style="--value: {{ g.value }}%"></span></span>
+      <span class="progress-row__value">{{ g.value }}%</span>
+    </li>
+  {% endfor %}
+</ul>

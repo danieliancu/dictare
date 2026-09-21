@@ -1,0 +1,8 @@
+{% with url_name=request.resolver_match.url_name %}
+<nav class="bottom-nav" aria-label="Navigare aplicație">
+  <a href="{% url 'practice:daily' %}" {% if url_name == 'session' or url_name == 'daily' %}aria-current="page"{% endif %}>{% icon "headphones" %}<span>Ascultă</span></a>
+  <a href="{% url 'practice:hub' %}" {% if url_name == 'hub' %}aria-current="page"{% endif %}>{% icon "list" %}<span>Exerciții</span></a>
+  <a href="{% url 'progress:mistakes' %}" {% if url_name == 'mistakes' %}aria-current="page"{% endif %}>{% icon "target" %}<span>Greșeli</span></a>
+  <a href="{% url 'progress:progress' %}" {% if url_name == 'progress' %}aria-current="page"{% endif %}>{% icon "chart-line" %}<span>Progres</span></a>
+</nav>
+{% endwith %}
