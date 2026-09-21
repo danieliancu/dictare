@@ -245,11 +245,6 @@ main {
   flex-wrap: wrap;
 }
 
-.site-footer__tagline {
-  color: var(--muted);
-  font-size: var(--text-sm);
-}
-
 .site-footer__links {
   display: flex;
   flex-wrap: wrap;

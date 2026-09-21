@@ -134,7 +134,7 @@ CREATE DATABASE dictare OWNER dictare;
 
 ```bash
 python manage.py migrate
-python manage.py seed_demo          # teme, accente, tipare, 75 de fraze, planuri, testimoniale,
+python manage.py seed_demo          # teme, accente, tipare, 135 de fraze, planuri, testimoniale,
                                     # audio mock și 2 utilizatori demo cu 3 săptămâni de istoric
 python manage.py createsuperuser    # pentru /admin/
 python manage.py runserver

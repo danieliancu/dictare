@@ -19,7 +19,7 @@ from apps.listening.services.audio import (
     get_audio_variant,
     phrase_ids_with_audio,
 )
-from apps.listening.services.patterns import pattern_for_position, patterns_for_variant
+from apps.listening.services.patterns import pattern_for_position, verified_patterns_for_variant
 from apps.progress.services import daily, mastery
 from apps.scoring.services import ScoreResult, Status, score_answer
 
@@ -296,8 +296,9 @@ def record_listening(
 
 
 def save_mistakes(attempt: ListeningAttempt, result: ScoreResult) -> None:
-    """Store word mistakes, attributed only to patterns that apply to the recording heard."""
-    applied = patterns_for_variant(attempt.audio_variant, attempt.phrase, attempt.level)
+    """Store word mistakes. A mistake is linked to a speech pattern only if a reviewer verified
+    that pattern as audible in the recording the learner heard; otherwise it stays word-level."""
+    applied = verified_patterns_for_variant(attempt.audio_variant, attempt.phrase)
     mistakes = []
     for w in result.mistakes:
         pp = pattern_for_position(applied, w.position)

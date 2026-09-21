@@ -42,27 +42,20 @@
 {% endif %}
 
 <h2 class="section-title">Teme</h2>
-{% if topics %}
-  <ul class="topic-grid">
-    {% for topic in topics %}
-      <li>
-        {% if user.is_authenticated %}
-          <form method="post" action="{% url 'practice:topic' topic.slug %}">
-            {% csrf_token %}
-            <button class="topic" type="submit">
-              <span class="tile tile--{% cycle 'blue' 'violet' 'green' 'teal' 'red' %}">{% icon topic.icon %}</span>
-              <span><strong>{{ topic.name_ro }}</strong><small lang="en-GB">{{ topic.name_en }}</small></span>
-            </button>
-          </form>
-        {% else %}
-          <a class="topic" href="{% url 'practice:daily' %}">
-            <span class="tile tile--{% cycle 'blue' 'violet' 'green' 'teal' 'red' %}">{% icon topic.icon %}</span>
-            <span><strong>{{ topic.name_ro }}</strong><small lang="en-GB">{{ topic.name_en }}</small></span>
-          </a>
-        {% endif %}
-      </li>
-    {% endfor %}
-  </ul>
+{% if topic_sections %}
+  {% for section in topic_sections %}
+    <section class="topic-section" aria-labelledby="topic-section-{{ forloop.counter }}">
+      <div class="topic-section__head">
+        <h3 id="topic-section-{{ forloop.counter }}">{{ section.title }}</h3>
+        <span class="topic-section__meta">{% icon "headphones" %} {{ section.total }} fraze</span>
+      </div>
+      <ul class="topic-row">
+        {% for card in section.cards %}
+          <li>{% include "components/topic_card.html" %}</li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
   {% if not user.is_authenticated %}<p class="muted small" style="margin-top: 1rem">Temele se deblochează după ce îți creezi un cont gratuit. Până atunci, încearcă ascultarea zilnică.</p>{% endif %}
 {% else %}
   <div class="card empty">

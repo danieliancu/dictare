@@ -16,7 +16,7 @@ from django.db.models import Prefetch
 from django.utils import timezone
 
 from apps.listening.models import PatternGroup, PhrasePattern, SpeechPattern
-from apps.listening.services.patterns import patterns_for_variant
+from apps.listening.services.patterns import verified_patterns_for_variant
 
 from ..models import PatternMastery
 
@@ -73,8 +73,8 @@ def recompute(user, pattern_ids: Iterable[int] | None = None) -> None:
     last_seen: dict[int, object] = {}
     for attempt in attempts:
         mistakes = list(attempt.mistakes.all())
-        # Only patterns that apply to the recording the learner actually heard.
-        applied = patterns_for_variant(attempt.audio_variant, attempt.phrase, attempt.level)
+        # Only phenomena verified as audible in the recording heard count as an exposure.
+        applied = verified_patterns_for_variant(attempt.audio_variant, attempt.phrase)
         for pp in (a.phrase_pattern for a in applied):
             if pp.pattern_id not in pattern_ids:
                 continue

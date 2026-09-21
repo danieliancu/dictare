@@ -1,9 +1,13 @@
 """Which speech patterns apply to a specific recording, and how to describe them.
 
 A `PhrasePattern` is a general tendency ("in natural speech /t/ may be glottalised here").
-An `AudioVariantPattern` records whether a reviewer verified it in one recording. The UI,
-mistake attribution and mastery all go through `patterns_for_variant`, so nothing claims a
-phenomenon is audible unless that recording was checked.
+An `AudioVariantPattern` records whether a reviewer verified it in one recording.
+
+* `patterns_for_variant` — for teaching (UI): verified phenomena plus expected ones, the
+  latter shown only as a general tendency.
+* `verified_patterns_for_variant` — for judging the learner (mistakes, mastery,
+  personalisation): PRESENT only. If we have not verified that a phenomenon is audible, we do
+  not use it to judge the user.
 """
 
 from __future__ import annotations
@@ -64,26 +68,48 @@ def patterns_for_variant(variant, phrase=None, level: str | None = None) -> list
             if level is None or pp.expected_at(level)
         ]
 
-    checks = {c.phrase_pattern_id: c for c in variant.pattern_checks.all()}
     applied = []
-    source = phrase if phrase is not None else variant.phrase
-    for pp in _sorted(source.phrase_patterns.all()):
-        check = checks.get(pp.pk)
+    for pp, check in _patterns_with_checks(variant, phrase):
         if check is not None and check.verification == Verification.ABSENT:
             continue
         if check is not None and check.verification == Verification.PRESENT:
-            applied.append(
-                AppliedPattern(
-                    pp,
-                    Verification.PRESENT,
-                    check.realisation,
-                    check.explanation_override_ro or pp.explanation_ro,
-                )
-            )
+            applied.append(_heard(pp, check))
             continue
         if pp.expected_at(variant.level):
             applied.append(AppliedPattern(pp, Verification.UNVERIFIED, "", pp.explanation_ro))
     return applied
+
+
+def verified_patterns_for_variant(variant, phrase=None) -> list[AppliedPattern]:
+    """Patterns a reviewer confirmed as audible in this recording (PRESENT only).
+
+    This is the only source for judging the learner (mistake attribution, mastery,
+    personalisation). Unverified or absent phenomena, and attempts without a recording,
+    never count.
+    """
+    if variant is None:
+        return []
+    return [
+        _heard(pp, check)
+        for pp, check in _patterns_with_checks(variant, phrase)
+        if check is not None and check.verification == Verification.PRESENT
+    ]
+
+
+def _patterns_with_checks(variant, phrase=None):
+    """(phrase pattern, its check for this variant or None), in sentence order."""
+    checks = {c.phrase_pattern_id: c for c in variant.pattern_checks.all()}
+    source = phrase if phrase is not None else variant.phrase
+    return [(pp, checks.get(pp.pk)) for pp in _sorted(source.phrase_patterns.all())]
+
+
+def _heard(pp: PhrasePattern, check: AudioVariantPattern) -> AppliedPattern:
+    return AppliedPattern(
+        pp,
+        Verification.PRESENT,
+        check.realisation,
+        check.explanation_override_ro or pp.explanation_ro,
+    )
 
 
 def _sorted(phrase_patterns) -> list[PhrasePattern]:

@@ -61,22 +61,36 @@ def servable_variants(phrase, level: str, accent):
     return _ranked(qs)
 
 
+def file_exists(variant) -> bool:
+    """A recording is available only if its file physically exists in storage."""
+    name = variant.audio_file.name if variant.audio_file else ""
+    return bool(name) and variant.audio_file.storage.exists(name)
+
+
 def get_audio_variant(phrase, level: str, accent) -> AudioVariant | None:
-    """Best servable recording, or None. Never generates audio."""
-    for variant in servable_variants(phrase, level, accent)[:3]:
-        if variant.audio_file.storage.exists(variant.audio_file.name):
+    """Best servable recording whose file exists, or None. Never generates audio.
+
+    Every ranked candidate is checked (there are only a handful per phrase): orphaned rows
+    whose file is missing are skipped, never served.
+    """
+    for variant in servable_variants(phrase, level, accent):
+        if file_exists(variant):
             return variant
     return None
 
 
 def phrase_ids_with_audio(level: str, accent) -> set[int]:
-    """Phrases that have a servable recording for this level and accent."""
+    """Phrases with at least one servable recording whose file really exists."""
     qs = AudioVariant.objects.filter(
         level=level, accent=accent, qa_status__in=servable_statuses()
     ).exclude(audio_file="")
     if settings.TTS_REQUIRE_APPROVAL:
         qs = qs.exclude(provider="mock")
-    return set(qs.values_list("phrase_id", flat=True))
+    available: set[int] = set()
+    for variant in qs.only("id", "phrase_id", "audio_file"):
+        if variant.phrase_id not in available and file_exists(variant):
+            available.add(variant.phrase_id)
+    return available
 
 
 def can_generate_on_request() -> bool:

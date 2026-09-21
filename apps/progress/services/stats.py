@@ -138,3 +138,68 @@ def overview(user) -> dict:
         "phrases_completed": done.values("phrase").distinct().count(),
         "demo": False,
     }
+
+
+CHART_RANGES = (7, 14, 30)
+
+
+def score_label(score: int) -> str:
+    if score >= 90:
+        return "Excelent"
+    if score >= 75:
+        return "Foarte bine"
+    if score >= 55:
+        return "Bine"
+    if score >= 30:
+        return "În progres"
+    return "La început"
+
+
+def greeting(user) -> str:
+    from django.utils import timezone as tz
+
+    hour = tz.now().astimezone(user.profile.tzinfo).hour
+    if 5 <= hour < 12:
+        return "Bună dimineața"
+    if 12 <= hour < 18:
+        return "Bună ziua"
+    return "Bună seara"
+
+
+@dataclass
+class ActivityDay:
+    day: date
+    count: int
+    level: int  # 0-4, for the heatmap colour
+    future: bool = False
+
+
+def activity_weeks(user, today: date | None = None, weeks: int = 6) -> list[list[ActivityDay]]:
+    """Calendar heatmap: `weeks` rows, Monday first, ending with the current week."""
+    from apps.progress.models import DailyPractice
+
+    today = today or user.profile.local_today()
+    start = today - timedelta(days=today.weekday() + 7 * (weeks - 1))
+    counts = dict(
+        DailyPractice.objects.filter(user=user, date__gte=start, date__lte=today).values_list(
+            "date", "completed_count"
+        )
+    )
+    goal = max(user.profile.daily_goal, 1)
+    rows = []
+    for w in range(weeks):
+        row = []
+        for d in range(7):
+            day = start + timedelta(days=7 * w + d)
+            count = counts.get(day, 0)
+            level = 0 if not count else min(4, 1 + (3 * count) // goal)
+            row.append(ActivityDay(day, count, level, future=day > today))
+        rows.append(row)
+    return rows
+
+
+def last_week_strip(user, today: date | None = None) -> list[ActivityDay]:
+    """The last 7 days, oldest first (for the streak card)."""
+    rows = activity_weeks(user, today, weeks=2)
+    days = [d for row in rows for d in row if not d.future]
+    return days[-7:]

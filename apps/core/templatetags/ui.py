@@ -110,3 +110,87 @@ def mmss(milliseconds) -> str:
     except (TypeError, ValueError):
         return "0:00"
     return f"{total // 60}:{total % 60:02d}"
+
+
+@register.filter
+def pick(value, options: str) -> str:
+    """Stable choice from a comma-separated list, e.g. a colour per id: {{ id|pick:"a,b,c" }}."""
+    items = [o.strip() for o in options.split(",") if o.strip()]
+    try:
+        return items[int(value) % len(items)] if items else ""
+    except (TypeError, ValueError):
+        return items[0] if items else ""
+
+
+@register.simple_tag
+def gauge(value, maximum=100, label: str = "") -> str:
+    """Semicircle gauge (0..maximum) as accessible inline SVG."""
+    try:
+        v, m = float(value or 0), float(maximum or 1)
+    except (TypeError, ValueError):
+        v, m = 0.0, 1.0
+    frac = max(0.0, min(1.0, v / m if m else 0))
+    length = 3.14159265 * 60  # half circumference, r=60
+    return format_html(
+        '<svg class="gauge" viewBox="0 0 140 80" role="img" aria-label="{label}">'
+        '<defs><linearGradient id="gauge-g" x1="0" x2="1"><stop offset="0" stop-color="#5b9bff"/>'
+        '<stop offset="1" stop-color="#1f6fe5"/></linearGradient></defs>'
+        '<path class="gauge__track" d="M10 70 A60 60 0 0 1 130 70" fill="none" stroke-width="12"'
+        ' stroke-linecap="round"/>'
+        '<path d="M10 70 A60 60 0 0 1 130 70" fill="none" stroke="url(#gauge-g)" stroke-width="12"'
+        ' stroke-linecap="round" stroke-dasharray="{len}" stroke-dashoffset="{off}"/></svg>',
+        label=label,
+        len=f"{length:.1f}",
+        off=f"{length * (1 - frac):.1f}",
+    )
+
+
+@register.simple_tag
+def score_chart(days, height: int = 180) -> str:
+    """Area/line chart of the average score per day (days without practice are gaps)."""
+    width, pad_x, pad_top, pad_bottom = 600, 34, 12, 26
+    inner_w, inner_h = width - pad_x - 8, height - pad_top - pad_bottom
+    n = max(len(days) - 1, 1)
+
+    def xy(i, score):
+        return pad_x + inner_w * i / n, pad_top + inner_h * (1 - score / 100)
+
+    points = [(i, d.avg_score) for i, d in enumerate(days) if d.avg_score is not None]
+    parts = []
+    for tick in (0, 50, 100):
+        y = pad_top + inner_h * (1 - tick / 100)
+        parts.append(
+            f'<line class="chart2__grid" x1="{pad_x}" x2="{width - 8}" y1="{y:.1f}" y2="{y:.1f}"/>'
+            f'<text class="chart2__tick" x="{pad_x - 8}" y="{y + 4:.1f}" text-anchor="end">'
+            f"{tick}</text>"
+        )
+    step = max(1, len(days) // 7)
+    for i, d in enumerate(days):
+        if i % step == 0 or i == len(days) - 1:
+            x = pad_x + inner_w * i / n
+            parts.append(
+                f'<text class="chart2__tick" x="{x:.1f}" y="{height - 6}" text-anchor="middle">'
+                f"{d.day.day}.{d.day.month:02d}</text>"
+            )
+    if points:
+        coords = [xy(i, s) for i, s in points]
+        line = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
+        base_y = pad_top + inner_h
+        area = f"{coords[0][0]:.1f},{base_y} {line} {coords[-1][0]:.1f},{base_y}"
+        parts.append(f'<polygon class="chart2__area" points="{area}"/>')
+        parts.append(f'<polyline class="chart2__line" points="{line}"/>')
+        for (x, y), (i, s) in zip(coords, points, strict=True):
+            parts.append(
+                f'<circle class="chart2__dot" cx="{x:.1f}" cy="{y:.1f}" r="4">'
+                f"<title>{days[i].day.day}.{days[i].day.month:02d}: scor {s}%</title></circle>"
+            )
+    practised = [s for _, s in points]
+    summary = f"Scor mediu pe zi în ultimele {len(days)} zile; " + (
+        f"între {min(practised)}% și {max(practised)}%." if practised else "fără exerciții."
+    )
+    return mark_safe(  # noqa: S308 - built only from numbers and dates
+        f'<svg class="chart2" viewBox="0 0 {width} {height}" role="img" aria-label="{summary}"'
+        f' preserveAspectRatio="none"><defs><linearGradient id="chart2-g" x1="0" x2="0" y1="0"'
+        f' y2="1"><stop offset="0" stop-color="#1f6fe5" stop-opacity=".28"/><stop offset="1"'
+        f' stop-color="#1f6fe5" stop-opacity="0"/></linearGradient></defs>{"".join(parts)}</svg>'
+    )

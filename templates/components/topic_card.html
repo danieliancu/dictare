@@ -1,0 +1,19 @@
+{# One topic: title, progress (phrases done / total) and a large round icon. #}
+{% if user.is_authenticated %}
+  <form method="post" action="{% url 'practice:topic' card.topic.slug %}">
+    {% csrf_token %}
+    <button class="topic" type="submit">
+{% else %}
+  <a class="topic" href="{% url 'practice:daily' %}">
+{% endif %}
+      <span class="topic__text">
+        <strong>{{ card.topic.name_ro }}</strong>
+        <small>{% icon "check-circle" %}<span>{{ card.done }}/{{ card.total }}</span><span class="sr-only"> fraze ascultate</span></small>
+      </span>
+      <span class="topic__art topic__art--{{ card.topic.order|pick:"blue,violet,green,orange,teal,red" }}" aria-hidden="true">{% icon card.topic.icon %}</span>
+{% if user.is_authenticated %}
+    </button>
+  </form>
+{% else %}
+  </a>
+{% endif %}

@@ -125,3 +125,18 @@ def pro_user(db, plans):
 @pytest.fixture
 def seeded(db):
     call_command("seed_demo", "--no-audio", "--no-demo-user", verbosity=0)
+
+
+@pytest.fixture(autouse=True)
+def no_real_openai(settings, monkeypatch, request):
+    """The suite never talks to OpenAI: no key, and any unmocked client call fails loudly."""
+    settings.OPENAI_API_KEY = ""
+    if request.node.get_closest_marker("allow_openai_client"):
+        return
+
+    def refuse(self):
+        raise AssertionError("A test tried to create a real OpenAI client (network call).")
+
+    from apps.ai.services import tts
+
+    monkeypatch.setattr(tts.OpenAIProvider, "_client", refuse)

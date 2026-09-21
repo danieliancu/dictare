@@ -18,6 +18,15 @@ def start_session(client):
     return PracticeSession.objects.get(pk=session_id), response.url
 
 
+def verify_all_present(attempt):
+    """Mark every expected phenomenon of the recording as verified audible (QA done)."""
+    from apps.listening.models import AudioVariantPattern
+
+    attempt.audio_variant.pattern_checks.update(
+        verification=AudioVariantPattern.Verification.PRESENT
+    )
+
+
 def current_attempt(session):
     return (
         ListeningAttempt.objects.filter(session_item__session=session)
@@ -54,10 +63,8 @@ class TestPublicPages:
         assert 'name="description"' in html
         for text in [
             "Ascultă mai întâi",
-            "Cum funcționează",
             "Exerciții personalizate",
             "Nu mai depinde de subtitrări.",
-            "Aude mai mult. Reușești mai mult.",
             "Serie de 12 zile",
             "1 din 10",
             "Scrie aici ce ai auzit...",
@@ -184,6 +191,7 @@ class TestPracticeFlow:
         session, url = start_session(client)
         client.get(url)
         attempt = current_attempt(session)
+        verify_all_present(attempt)
         words = attempt.phrase.text.split()
         client.post(
             reverse("practice:check", args=[attempt.pk]), {"answer": " ".join(words[1:])}, **HTMX
@@ -382,9 +390,10 @@ class TestProgressPages:
         session, url = start_session(client)
         client.get(url)
         attempt = current_attempt(session)
+        verify_all_present(attempt)
         client.post(reverse("practice:check", args=[attempt.pk]), {"answer": "would"}, **HTMX)
         html = client.get(reverse("progress:progress")).content.decode()
-        assert "Serie curentă" in html and "1 zi" in html
+        assert "Serie zilnică" in html and "zi la rând" in html
         partial = client.get(reverse("progress:progress"), **HTMX).content.decode()
         assert "<html" not in partial and "Scor general" in partial
         mistakes = client.get(reverse("progress:mistakes")).content.decode()
@@ -405,6 +414,6 @@ def test_seed_demo_command(seeded):
     from apps.listening.models import ListeningPhrase, SpeechPattern, Topic
 
     assert ListeningPhrase.objects.count() >= 50
-    assert Topic.objects.count() == 10
+    assert Topic.objects.count() == 20
     assert SpeechPattern.objects.count() >= 9
     assert ListeningPhrase.objects.filter(text="Shall we head off?").exists()

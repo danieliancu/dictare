@@ -12,12 +12,11 @@
 <section class="hero" aria-labelledby="hero-title">
   <div class="container hero__inner">
     <div class="hero__copy">
-      <p class="eyebrow">Conversații reale. Un tu mai sigur pe tine.</p>
       <h1 id="hero-title">Antrenează-te<br class="br-lg"> pentru engleza britanică</h1>
-      <p class="lead">Începe să înțelegi engleza britanică vorbită fără să te bazezi pe subtitrări. Exersează cu audio realist, repetă expresii dificile, vezi transcrieri și urmărește-ți progresul prin exerciții create special pentru tine.</p>
+      <p class="lead">Începe să înțelegi engleza britanică vorbită. Exersează cu audio realist, repetă expresii dificile, vezi transcrieri și urmărește-ți progresul prin exerciții create special pentru tine.</p>
       <div class="hero__ctas">
         <a class="btn btn--primary btn--lg" href="{% url 'practice:daily' %}">Începe să asculți {% icon "arrow-right" %}</a>
-        <a class="btn btn--outline btn--lg" href="#cum-functioneaza">{% icon "play-circle" %} Vezi cum funcționează</a>
+        <a class="btn btn--outline btn--lg" href="#functionalitati">{% icon "play-circle" %} Vezi cum funcționează</a>
       </div>
       <ul class="hero__perks">
         <li>{% icon "headphones" %} Audio autentic britanic</li>
@@ -68,27 +67,9 @@
     <ul class="features__grid">
       <li class="feature">{% icon "headphones" %}<h3>Ascultă mai întâi</h3><p>Aude expresia înainte de a vedea textul.</p></li>
       <li class="feature">{% icon "document" %}<h3>Vezi transcrierea</h3><p>Descoperă propoziția exactă după ce încerci.</p></li>
-      <li class="feature">{% icon "brain" %}<h3>Înțelege vorbirea naturală</h3><p>Învață reduceri, legături între cuvinte și forme slabe.</p></li>
+      <li class="feature">{% icon "ear" %}<h3>Înțelege vorbirea naturală</h3><p>Învață reduceri, legături între cuvinte și forme slabe.</p></li>
       <li class="feature">{% icon "chart" %}<h3>Urmărește-ți greșelile</h3><p>Revino asupra tiparelor pe care le ratezi cel mai des.</p></li>
     </ul>
-  </div>
-</section>
-
-{# ============ HOW IT WORKS ============ #}
-<section class="band-section" id="cum-functioneaza" aria-labelledby="how-title">
-  <div class="container">
-    <div class="band how">
-      <div class="how__intro">
-        <h2 id="how-title">Cum funcționează</h2>
-        <p>Patru pași simpli pentru rezultate mai bune.</p>
-      </div>
-      <ol class="how__steps">
-        <li class="how-step"><span class="how-step__num" aria-hidden="true">1</span>{% icon "headphones" %}<h3>Ascultă</h3><p>Aude o expresie reală de engleză britanică.</p></li>
-        <li class="how-step"><span class="how-step__num" aria-hidden="true">2</span>{% icon "keyboard" %}<h3>Tastează ce ai auzit</h3><p>Scrie propoziția cu propriile tale cuvinte.</p></li>
-        <li class="how-step"><span class="how-step__num" aria-hidden="true">3</span>{% icon "eye" %}<h3>Vezi transcrierea</h3><p>Descoperă propoziția exactă și notele utile.</p></li>
-        <li class="how-step"><span class="how-step__num" aria-hidden="true">4</span>{% icon "refresh" %}<h3>Repetă și îmbunătățește</h3><p>Ascultă din nou, observă tiparele și obține rezultate mai bune.</p></li>
-      </ol>
-    </div>
   </div>
 </section>
 
@@ -186,7 +167,6 @@
     <path fill="#d4e2fb" opacity=".7" d="M0 260c220 20 420-40 640-30s420 60 800 10v80H0z"/>
   </svg>
   <div class="container final-cta__inner">
-    <p class="eyebrow">Un tu mai sigur pe tine</p>
     <h2 id="cta-title">Nu mai depinde de subtitrări.</h2>
     <p class="lead">Construiește încredere în înțelegerea englezei britanice, cu exerciții scurte, pas cu pas.</p>
     <a class="btn btn--primary btn--lg" href="{% url 'practice:daily' %}">Începe gratuit {% icon "arrow-right" %}</a>

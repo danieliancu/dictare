@@ -4,7 +4,6 @@ from django.db.models import Count, Prefetch
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
-from django.utils import timezone
 from django.utils.html import format_html
 from django.views.decorators.http import require_POST
 
@@ -211,6 +210,21 @@ def duration_label(obj):
     return seconds if obj.duration_measured else f"≈{seconds}"
 
 
+@admin.display(description="Fișier")
+def file_status(obj):
+    from .services.audio import file_exists
+
+    return "✓" if file_exists(obj) else "lipsă"
+
+
+@admin.display(description="Neverificate")
+def unverified_count(obj):
+    from .services.qa import unreviewed_patterns
+
+    count = len(unreviewed_patterns(obj))
+    return count or "—"
+
+
 @admin.register(AudioVariant)
 class AudioVariantAdmin(admin.ModelAdmin):
     list_display = [
@@ -222,6 +236,8 @@ class AudioVariantAdmin(admin.ModelAdmin):
         "model",
         duration_label,
         "qa_status",
+        unverified_count,
+        file_status,
         "generated_at",
         audio_preview,
     ]
@@ -239,6 +255,7 @@ class AudioVariantAdmin(admin.ModelAdmin):
     autocomplete_fields = ["phrase"]
     readonly_fields = [
         audio_preview,
+        "pattern_review",
         "model",
         "instructions",
         "speed",
@@ -266,7 +283,10 @@ class AudioVariantAdmin(admin.ModelAdmin):
                 ]
             },
         ),
-        ("QA", {"fields": ["qa_status", "qa_notes", "reviewed_by", "reviewed_at"]}),
+        (
+            "QA",
+            {"fields": ["qa_status", "pattern_review", "qa_notes", "reviewed_by", "reviewed_at"]},
+        ),
         (
             "Generare",
             {
@@ -290,11 +310,45 @@ class AudioVariantAdmin(admin.ModelAdmin):
     date_hierarchy = "generated_at"
     change_list_template = "admin/listening/audiovariant/change_list.html"
 
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("pattern_checks", "phrase__phrase_patterns")
+        )
+
+    @admin.display(description="Verificare fenomene")
+    def pattern_review(self, obj):
+        from .services.qa import pattern_summary, unverified_label
+
+        if obj is None or obj.pk is None:
+            return "—"
+        summary = pattern_summary(obj)
+        if summary["unverified"]:
+            return unverified_label(summary["unverified"]) + " (necesare pentru aprobare)"
+        return "Toate fenomenele așteptate sunt verificate."
+
     def save_model(self, request, obj, form, change):
+        """Approval is applied in save_related, after the pattern verifications are saved."""
+        self._requested_status = None
         if "qa_status" in form.changed_data:
-            obj.reviewed_by = request.user
-            obj.reviewed_at = timezone.now()
+            self._requested_status = obj.qa_status
+            obj.qa_status = form.initial.get("qa_status", AudioVariant.QAStatus.PENDING)
         super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        from .services.qa import approval_problems, set_status
+
+        super().save_related(request, form, formsets, change)
+        status = getattr(self, "_requested_status", None)
+        if not status:
+            return
+        variant = AudioVariant.objects.get(pk=form.instance.pk)
+        problems = approval_problems(variant) if status == AudioVariant.QAStatus.APPROVED else []
+        if problems:
+            messages.error(request, "Nu poate fi aprobată: " + "; ".join(problems) + ".")
+            return
+        set_status([variant], status, request.user)
 
     def save_formset(self, request, form, formset, change):
         from .services.qa import mark_pattern_checked
@@ -309,20 +363,18 @@ class AudioVariantAdmin(admin.ModelAdmin):
 
     @admin.action(description="Aprobă variantele selectate", permissions=["change"])
     def approve_selected(self, request, queryset):
-        from .services.qa import set_status
+        from .services.qa import describe_result, set_status
 
         changed, skipped = set_status(queryset, AudioVariant.QAStatus.APPROVED, request.user)
-        msg = f"{changed} variante aprobate."
-        if skipped:
-            msg += f" {skipped} omise (audio mock/placeholder sau fără fișier nu se aprobă)."
-        self.message_user(request, msg)
+        level = messages.WARNING if skipped else messages.SUCCESS
+        self.message_user(request, describe_result(changed, skipped), level)
 
     @admin.action(description="Respinge variantele selectate", permissions=["change"])
     def reject_selected(self, request, queryset):
-        from .services.qa import set_status
+        from .services.qa import describe_result, set_status
 
-        changed, _ = set_status(queryset, AudioVariant.QAStatus.REJECTED, request.user)
-        self.message_user(request, f"{changed} variante respinse.")
+        changed, skipped = set_status(queryset, AudioVariant.QAStatus.REJECTED, request.user)
+        self.message_user(request, describe_result(changed, skipped, "respinse"))
 
     # --- side-by-side review --------------------------------------------------------------
 
@@ -343,12 +395,18 @@ class AudioVariantAdmin(admin.ModelAdmin):
 
     def review_view(self, request):
         """Clear / Natural / Fast of each phrase side by side, for listening QA."""
+        from .services.qa import approval_problems, pattern_summary
+
         if not self.has_view_permission(request):
             raise PermissionDenied
         only_pilot = request.GET.get("pilot", "1") == "1"
         status = request.GET.get("status", "")
         voice = request.GET.get("voice", "")
-        variants = AudioVariant.objects.exclude(provider="mock").select_related("accent")
+        variants = (
+            AudioVariant.objects.exclude(provider="mock")
+            .select_related("accent", "phrase")
+            .prefetch_related("pattern_checks", "phrase__phrase_patterns")
+        )
         if status:
             variants = variants.filter(qa_status=status)
         if voice:
@@ -371,7 +429,14 @@ class AudioVariantAdmin(admin.ModelAdmin):
             if not phrase.review_variants:
                 continue
             columns = [
-                (label, [v for v in phrase.review_variants if v.level == level])
+                (
+                    label,
+                    [
+                        (v, pattern_summary(v), approval_problems(v))
+                        for v in phrase.review_variants
+                        if v.level == level
+                    ],
+                )
                 for level, label in Level.choices
             ]
             rows.append((phrase, columns))
@@ -392,7 +457,7 @@ class AudioVariantAdmin(admin.ModelAdmin):
         return TemplateResponse(request, "admin/listening/audiovariant/review.html", context)
 
     def review_status_view(self, request, pk: int):
-        from .services.qa import set_status
+        from .services.qa import approval_problems, set_status
 
         if not self.has_change_permission(request):
             raise PermissionDenied
@@ -401,14 +466,18 @@ class AudioVariantAdmin(admin.ModelAdmin):
         if variant is None or status not in AudioVariant.QAStatus.values:
             messages.error(request, "Cerere invalidă.")
         else:
-            _, skipped = set_status(
-                [variant],
-                status,
-                request.user,
-                notes=request.POST.get("qa_notes", variant.qa_notes),
+            problems = (
+                approval_problems(variant) if status == AudioVariant.QAStatus.APPROVED else []
             )
-            if skipped:
-                messages.warning(request, "Audio mock/placeholder nu poate fi aprobat.")
+            if problems:
+                messages.error(request, "Nu poate fi aprobată: " + "; ".join(problems) + ".")
+            else:
+                set_status(
+                    [variant],
+                    status,
+                    request.user,
+                    notes=request.POST.get("qa_notes", variant.qa_notes),
+                )
         back = request.POST.get("next") or ""
         if not back.startswith("/admin/"):
             back = reverse("admin:listening_audiovariant_review")

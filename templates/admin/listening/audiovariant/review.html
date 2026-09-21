@@ -42,10 +42,12 @@
       <td><div class="qa-phrase" lang="en-GB">{{ phrase.text }}</div><div class="qa-meta">{{ phrase.translation_ro }}</div></td>
       {% for label, variants in columns %}
         <td>
-          {% for v in variants %}
+          {% for v, summary, problems in variants %}
             <div class="qa-var">
               <audio controls preload="none" src="{{ v.audio_file.url }}"></audio>
               <div class="qa-meta">{{ v.voice }} · {{ v.model|default:v.provider }} · {{ v.accent.code }} · v{{ v.engine_version }} · <span class="qa-status {{ v.qa_status }}">{{ v.get_qa_status_display }}</span> · <a href="{% url 'admin:listening_audiovariant_change' v.pk %}">tipare</a></div>
+              <div class="qa-meta">Fenomene: {{ summary.total }} · prezente {{ summary.present }} · absente {{ summary.absent }} · <strong{% if summary.unverified %} class="qa-status rejected"{% endif %}>neverificate {{ summary.unverified }}</strong></div>
+              {% if problems %}<div class="qa-meta qa-status rejected">Nu poate fi aprobată: {{ problems|join:"; " }}</div>{% endif %}
               <details><summary>instrucțiuni</summary><div class="qa-meta">{{ v.instructions }}</div></details>
               {% if can_change %}
                 <form method="post" action="{% url 'admin:listening_audiovariant_review_status' v.pk %}">

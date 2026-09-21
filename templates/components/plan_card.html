@@ -9,7 +9,9 @@
     {% for feature in plan.feature_list %}<li>{% icon "check" %}<span>{{ feature }}</span></li>{% endfor %}
   </ul>
   {% if plan.code == "free" %}
-    {% if user.is_authenticated %}
+    {% if entitlements.is_pro %}
+      {# Pro members: no action on the free plan card #}
+    {% elif user.is_authenticated %}
       <a class="btn btn--outline btn--block" href="{% url 'practice:daily' %}">Continuă să asculți</a>
     {% else %}
       <a class="btn btn--outline btn--block" href="{% url 'practice:daily' %}">Începe gratuit</a>

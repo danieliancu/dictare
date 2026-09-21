@@ -17,6 +17,7 @@ from apps.scoring.services import Status, score_answer
 
 from .models import ListeningAttempt, PracticeSession, SessionKind
 from .services import sessions as svc
+from .services.topics import topic_sections
 
 STATUS_LABELS = {
     Status.CORRECT: "corect",
@@ -184,9 +185,8 @@ def _render_exercise(request, session, position, status=200, extra=None):
 def hub(request):
     owner = svc.owner_from_request(request, create=False)
     ent = get_entitlements(owner.user)
-    topics = Topic.objects.filter(active=True)
     context = {
-        "topics": topics,
+        "topic_sections": topic_sections(request.user),
         "entitlements": ent,
         "groups": group_progress(request.user) if request.user.is_authenticated else None,
         "remaining": svc.remaining_exercises(owner, ent) if owner.anon_key or owner.user else None,

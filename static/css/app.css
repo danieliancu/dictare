@@ -833,3 +833,8 @@ kbd {
   font-size: 0.8rem;
   color: var(--ink-2);
 }
+
+/* Keep the secondary "show transcript" action clearly apart from "Verifică". */
+.answer .action-bar .reveal-btn {
+  margin-top: var(--space-4);
+}

@@ -24,10 +24,6 @@
   padding-block: clamp(2.5rem, 1rem + 4vw, 4.2rem) var(--space-10);
 }
 
-.hero__copy .eyebrow {
-  margin-bottom: calc(-1 * var(--space-1));
-}
-
 .hero__copy h1 {
   max-width: 18ch;
 }
@@ -43,10 +39,6 @@
 
   .br-lg {
     display: inline;
-  }
-
-  .how__intro h2 {
-    white-space: nowrap;
   }
 }
 
@@ -196,93 +188,6 @@
   padding-block: var(--space-4);
 }
 
-/* ---------- How it works ---------- */
-.how {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(0, 3.3fr);
-  align-items: center;
-  gap: var(--space-6);
-}
-
-.how__intro {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.how__intro h2,
-.personal__intro h2 {
-  font-size: clamp(1.6rem, 1.2rem + 1.1vw, 2.05rem);
-}
-
-.how__intro p {
-  color: var(--muted);
-}
-
-.how__steps {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-8);
-  list-style: none;
-}
-
-.how-step {
-  position: relative;
-  display: grid;
-  align-content: start;
-  gap: 0.45rem;
-  padding: 1.35rem 1.1rem 1.2rem;
-  border-radius: var(--radius);
-  background: #fff;
-  box-shadow: var(--shadow-sm);
-}
-
-.how-step__num {
-  position: absolute;
-  top: -10px;
-  left: -10px;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--blue-100);
-  color: var(--blue-600);
-  font-weight: 700;
-  font-size: 0.85rem;
-  box-shadow: 0 0 0 4px #f1f6fe;
-}
-
-.how-step > .icon {
-  width: 34px;
-  height: 34px;
-  margin: 0 auto 0.3rem;
-  color: var(--blue-500);
-}
-
-.how-step h3 {
-  font-size: 0.98rem;
-}
-
-.how-step p {
-  color: var(--muted);
-  font-size: 0.86rem;
-  line-height: 1.45;
-}
-
-.how-step:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: calc(-1 * var(--space-8) + 8px);
-  width: 16px;
-  height: 16px;
-  background: currentColor;
-  color: var(--muted-2);
-  -webkit-mask: url("../icons/arrow-right.svg") center / contain no-repeat;
-  mask: url("../icons/arrow-right.svg") center / contain no-repeat;
-  transform: translateY(-50%);
-}
-
 /* ---------- Personalised practice ---------- */
 .personal {
   display: grid;
@@ -307,8 +212,13 @@
 }
 
 .personal .card {
+  align-self: stretch; /* both white cards share the row height on desktop */
   box-shadow: var(--shadow-sm);
   border-color: transparent;
+}
+
+.personal .overall-card {
+  align-content: space-between;
 }
 
 .overall-card {
@@ -603,17 +513,8 @@
     grid-column: 1 / -1;
   }
 
-  .how {
-    grid-template-columns: 1fr;
-  }
 
-  .how__steps {
-    gap: var(--space-6);
-  }
 
-  .how-step:not(:last-child)::after {
-    right: calc(-1 * var(--space-6) + 4px);
-  }
 }
 
 @media (max-width: 1024px) {
@@ -629,13 +530,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .how__steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 
-  .how-step:not(:last-child)::after {
-    display: none;
-  }
 
   .testimonial {
     grid-template-columns: minmax(0, 1fr);
@@ -734,8 +629,7 @@
 }
 
 @media (max-width: 560px) {
-  .features__grid,
-  .how__steps {
+  .features__grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -752,16 +646,5 @@
     margin: 0;
   }
 
-  .how-step {
-    grid-template-columns: auto minmax(0, 1fr);
-    column-gap: var(--space-4);
-    padding: 1.1rem 1.1rem 1.1rem 1.4rem;
-  }
 
-  .how-step > .icon {
-    grid-row: span 2;
-    margin: 0;
-    width: 30px;
-    height: 30px;
-  }
 }

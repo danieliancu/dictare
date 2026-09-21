@@ -11,19 +11,42 @@ from apps.practice.models import AttemptMistake
 
 from .models import PatternMastery
 from .services.mastery import group_progress
-from .services.stats import user_progress
+from .services.stats import (
+    CHART_RANGES,
+    activity_weeks,
+    greeting,
+    last_week_strip,
+    score_label,
+    user_progress,
+)
 
 FREE_HISTORY_DAYS = 7
 
 
 @login_required
 def progress(request):
-    stats = user_progress(request.user)
+    try:
+        chart_days = int(request.GET.get("zile", 14))
+    except ValueError:
+        chart_days = 14
+    if chart_days not in CHART_RANGES:
+        chart_days = 14
+    stats = user_progress(request.user, chart_days=chart_days)
+    groups = group_progress(request.user)
     context = {
         "stats": stats,
-        "groups": group_progress(request.user),
+        "groups": groups,
         "entitlements": get_entitlements(request.user),
-        "max_day": max((d.count for d in stats.days), default=0) or 1,
+        "chart_days": chart_days,
+        "chart_ranges": CHART_RANGES,
+        "greeting": greeting(request.user),
+        "score_label": score_label(stats.overall_score),
+        "week_strip": last_week_strip(request.user),
+        "activity": activity_weeks(request.user),
+        "recommendations": sorted(stats.patterns, key=lambda m: m.mastery)[:3],
+        "remaining_today": max(0, stats.daily_goal - stats.today_count),
+        "without_transcript": 100 - stats.transcript_dependency,
+        "normal_speed": 100 - stats.slowed_down_share,
     }
     template = "pages/progress/progress.html"
     if request.htmx and not request.htmx.history_restore_request:

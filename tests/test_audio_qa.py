@@ -49,6 +49,17 @@ def make_variant(
     return variant
 
 
+def review_all(variant, verification=AudioVariantPattern.Verification.PRESENT):
+    """Editorial QA done: every expected phenomenon marked present (or absent)."""
+    for pp in variant.phrase.phrase_patterns.all():
+        if pp.expected_at(variant.level):
+            AudioVariantPattern.objects.update_or_create(
+                audio_variant=variant,
+                phrase_pattern=pp,
+                defaults={"verification": verification},
+            )
+
+
 @pytest.mark.django_db
 class TestSelection:
     def test_human_approved_beats_tts_approved(self, phrases, accent):
@@ -252,6 +263,7 @@ class TestQAPermissions:
             *Permission.objects.filter(codename__in=["view_audiovariant", "change_audiovariant"])
         )
         variant = make_variant(phrases[0], accent, status=QA.PENDING)
+        review_all(variant)
         client.force_login(staff)
         page = client.get(reverse("admin:listening_audiovariant_review") + "?pilot=0")
         assert page.status_code == 200 and phrases[0].text in page.content.decode()
@@ -268,6 +280,8 @@ class TestQAPermissions:
         admin_user = User.objects.create_superuser(email="a@example.com", password="x-123-abc")
         mock = make_variant(phrases[0], accent, provider="mock", status=QA.PENDING)
         real = make_variant(phrases[1], accent, provider="openai", status=QA.PENDING)
+        review_all(mock)
+        review_all(real)
         client.force_login(admin_user)
         client.post(
             reverse("admin:listening_audiovariant_changelist"),

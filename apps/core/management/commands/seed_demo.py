@@ -10,9 +10,12 @@ from __future__ import annotations
 import random
 from datetime import datetime, time, timedelta
 
+from django.conf import settings
+from django.core.files import File
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
+from django.utils.text import slugify
 
 from apps.accounts.models import User
 from apps.ai.services.tts import DEFAULT_ACCENT_INSTRUCTIONS, TTSError, generate_variant
@@ -46,6 +49,16 @@ TOPICS = [
     ("friends", "Cu prietenii", "Friends", "coffee"),
     ("small-talk", "Small talk", "Small talk", "sun"),
     ("fast-british", "Engleză britanică rapidă", "Fast British speech", "zap"),
+    ("home", "Acasă și vecini", "At home & neighbours", "key"),
+    ("eating-out", "La restaurant și cafenea", "Eating out", "utensils"),
+    ("family", "În familie", "Family life", "family"),
+    ("job-interview", "Interviu de angajare", "Job interviews", "user-check"),
+    ("banking", "Bancă și bani", "Banking & money", "wallet"),
+    ("renting", "Chirie și proprietari", "Renting", "building"),
+    ("deliveries", "Poștă și livrări", "Post & deliveries", "package"),
+    ("airport", "Aeroport și zboruri", "Airports & flights", "plane"),
+    ("driving", "Condus și parcare", "Driving & parking", "car"),
+    ("directions", "Cum ajung la…", "Asking for directions", "map-pin"),
 ]
 
 ACCENTS = [
@@ -384,7 +397,7 @@ class Command(BaseCommand):
 
     def seed_testimonials(self) -> None:
         for order, (quote, name, location, cc) in enumerate(TESTIMONIALS):
-            Testimonial.objects.update_or_create(
+            testimonial, _ = Testimonial.objects.update_or_create(
                 author_name=name,
                 defaults={
                     "quote": quote,
@@ -394,6 +407,13 @@ class Command(BaseCommand):
                     "active": True,
                 },
             )
+            # Placeholder portraits (AI-generated) sized for the 104 px avatar at 2x.
+            portrait = (
+                settings.BASE_DIR / "static" / "images" / "testimonials" / f"{slugify(name)}.webp"
+            )
+            if not testimonial.avatar and portrait.exists():
+                with portrait.open("rb") as fh:
+                    testimonial.avatar.save(portrait.name, File(fh), save=True)
 
     def seed_audio(self) -> None:
         """Offline placeholder audio only. Real audio: `generate_audio --real-api`."""
